@@ -1,0 +1,47 @@
+# Dépendances
+/vendor
+/node_modules
+
+# Fichiers d'environnement
+.env
+.env.*
+!.env.example
+
+# Clés et certificats
+*.key
+*.pem
+
+# Logs
+/storage/logs
+*.log
+
+# Cache, sessions, vues compilées
+/storage/framework/cache
+/storage/framework/sessions
+/storage/framework/views
+/bootstrap/cache
+
+# Fichiers générés
+/public/storage
+
+# IDE / éditeurs
+.idea
+.vscode
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests / couverture
+/coverage
+.phpunit.result.cache
+
+# Divers
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker (si utilisé)
+docker-compose.override.yml
