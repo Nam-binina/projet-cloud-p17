@@ -1,9 +1,44 @@
 version: '3.8'
+
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: projet-cloud-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: auth_db
+      POSTGRES_MULTIPLE_DATABASES: auth_db,cartes_db,web_db,mobile_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
   auth-api:
     build: ./auth-api
     ports:
       - "3000:3000"
+    environment:
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_DATABASE=auth_db
+      - PG_USER=postgres
+      - PG_PASSWORD=admin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
 
   tile-server:
     image: overv/openstreetmap-tile-server:1.4.0
@@ -14,17 +49,46 @@ services:
       - ./cartes/data:/var/lib/postgresql/14/main
     environment:
       - THREADS=4
+    networks:
+      - app-network
 
   web:
     build: ./web
     ports:
-      - "80:80"        
+      - "80:80"
+    environment:
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_DATABASE=web_db
+      - PG_USER=postgres
+      - PG_PASSWORD=admin
     depends_on:
       - auth-api
       - tile-server
+      - postgres
+    networks:
+      - app-network
 
   mobile:
     build: ./mobile
     ports:
-      - "8100:80"       
+      - "8100:80"
+    environment:
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_DATABASE=mobile_db
+      - PG_USER=postgres
+      - PG_PASSWORD=admin
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+
+volumes:
+  postgres-data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge       
 
