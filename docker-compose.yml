@@ -46,9 +46,11 @@ services:
     ports:
       - "8081:80"
     volumes:
-      - ./cartes/data:/var/lib/postgresql/14/main
+      - tile-server-data:/var/lib/postgresql/12/main
+      - ./cartes/data/antananarivo.osm.pbf:/data.osm.pbf
     environment:
       - THREADS=4
+    command: run
     networks:
       - app-network
 
@@ -86,6 +88,8 @@ services:
 
 volumes:
   postgres-data:
+    driver: local
+  tile-server-data:
     driver: local
 
 networks:
