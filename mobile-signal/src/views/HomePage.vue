@@ -69,25 +69,46 @@ import {
 import L from 'leaflet';
 
 /* =========================
-   📌 Données
+   📌 Données (locales)
    ========================= */
-const signalements = ref<any[]>([
-  { lat: -18.879, lng: 47.508, statut: 'nouveau', surface: 120, budget: 1500000 },
-  { lat: -18.905, lng: 47.520, statut: 'en_cours', surface: 200, budget: 2500000 },
-  { lat: -18.860, lng: 47.490, statut: 'termine', surface: 300, budget: 3500000 }
-]);
+const signalements = ref<any[]>([]);
+
+/* =========================
+   💾 OFFLINE STORAGE
+   ========================= */
+function sauvegarderLocal() {
+  localStorage.setItem('signalements', JSON.stringify(signalements.value));
+}
+
+function chargerLocal() {
+  const data = localStorage.getItem('signalements');
+  if (data) {
+    signalements.value = JSON.parse(data);
+  } else {
+    // données par défaut (1er lancement)
+    signalements.value = [
+      { lat: -18.879, lng: 47.508, statut: 'nouveau', surface: 120, budget: 1500000 },
+      { lat: -18.905, lng: 47.520, statut: 'en_cours', surface: 200, budget: 2500000 },
+      { lat: -18.860, lng: 47.490, statut: 'termine', surface: 300, budget: 3500000 }
+    ];
+  }
+}
 
 /* =========================
    📊 Récap
    ========================= */
 const totalSignalements = computed(() => signalements.value.length);
+
 const totalSurface = computed(() =>
   signalements.value.reduce((s, x) => s + x.surface, 0)
 );
+
 const totalBudget = computed(() =>
   signalements.value.reduce((s, x) => s + x.budget, 0)
 );
+
 const avancement = computed(() => {
+  if (signalements.value.length === 0) return 0;
   const t = signalements.value.filter(s => s.statut === 'termine').length;
   return Math.round((t / signalements.value.length) * 100);
 });
@@ -97,6 +118,7 @@ const avancement = computed(() => {
    ========================= */
 let map: L.Map;
 let nouveauMarker: L.Marker | null = null;
+
 const showForm = ref(false);
 const positionTemp = ref<{ lat: number; lng: number } | null>(null);
 
@@ -121,7 +143,8 @@ function validerSignalement() {
     budget: form.value.budget
   });
 
-  // reset
+  sauvegarderLocal();
+
   showForm.value = false;
   form.value = { statut: 'nouveau', surface: 0, budget: 0 };
   positionTemp.value = null;
@@ -140,6 +163,8 @@ function afficherMarkers() {
 }
 
 onMounted(() => {
+  chargerLocal();
+
   map = L.map('map').setView([-18.879, 47.508], 13);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
