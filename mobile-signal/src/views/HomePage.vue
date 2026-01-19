@@ -2,17 +2,21 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <ion-title>Récapitulatif & Carte</ion-title>
+        <ion-title>Signalements</ion-title>
       </ion-toolbar>
     </ion-header>
 
     <ion-content>
-      <!-- 📊 Récapitulatif -->
+      <!-- 📊 Récap -->
       <div class="recap">
         <p><strong>Total :</strong> {{ totalSignalements }}</p>
         <p><strong>Surface :</strong> {{ totalSurface }} m²</p>
         <p><strong>Budget :</strong> {{ totalBudget }} Ar</p>
         <p><strong>Avancement :</strong> {{ avancement }} %</p>
+
+        <ion-button expand="block" color="primary" @click="activerSignalement">
+          ➕ Signaler
+        </ion-button>
       </div>
 
       <!-- 🗺️ Carte -->
@@ -22,13 +26,14 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, computed } from 'vue';
+import { onMounted, computed, ref } from 'vue';
 import {
   IonPage,
   IonHeader,
   IonToolbar,
   IonTitle,
-  IonContent
+  IonContent,
+  IonButton
 } from '@ionic/vue';
 import L from 'leaflet';
 
@@ -36,109 +41,77 @@ import L from 'leaflet';
    📌 Données simulées
    ========================= */
 const signalements = [
-  {
-    lat: -18.879,
-    lng: 47.508,
-    statut: 'nouveau',
-    date: '2026-01-10',
-    surface: 120,
-    budget: 1500000
-  },
-  {
-    lat: -18.905,
-    lng: 47.520,
-    statut: 'en_cours',
-    date: '2026-01-12',
-    surface: 200,
-    budget: 2500000
-  },
-  {
-    lat: -18.860,
-    lng: 47.490,
-    statut: 'termine',
-    date: '2026-01-14',
-    surface: 300,
-    budget: 3500000
-  }
+  { lat: -18.879, lng: 47.508, statut: 'nouveau', surface: 120, budget: 1500000 },
+  { lat: -18.905, lng: 47.520, statut: 'en_cours', surface: 200, budget: 2500000 },
+  { lat: -18.860, lng: 47.490, statut: 'termine', surface: 300, budget: 3500000 }
 ];
 
 /* =========================
-   📊 Calculs récap
+   📊 Récap
    ========================= */
 const totalSignalements = computed(() => signalements.length);
-
-const totalSurface = computed(() =>
-  signalements.reduce((s, x) => s + x.surface, 0)
-);
-
-const totalBudget = computed(() =>
-  signalements.reduce((s, x) => s + x.budget, 0)
-);
-
+const totalSurface = computed(() => signalements.reduce((s, x) => s + x.surface, 0));
+const totalBudget = computed(() => signalements.reduce((s, x) => s + x.budget, 0));
 const avancement = computed(() => {
-  const termines = signalements.filter(s => s.statut === 'termine').length;
-  return Math.round((termines / signalements.length) * 100);
+  const t = signalements.filter(s => s.statut === 'termine').length;
+  return Math.round((t / signalements.length) * 100);
 });
 
 /* =========================
-   🎨 Icône marker par statut
+   🗺️ Carte & signalement
    ========================= */
-function getIcon(statut: string) {
-  let color = 'red';
-  if (statut === 'en_cours') color = 'orange';
-  if (statut === 'termine') color = 'green';
+let map: L.Map;
+let nouveauMarker: L.Marker | null = null;
+const modeSignalement = ref(false);
 
-  return L.divIcon({
-    html: `<div class="marker ${color}"></div>`,
-    iconSize: [16, 16],
-    className: ''
-  });
+function activerSignalement() {
+  modeSignalement.value = true;
+  alert('Cliquez sur la carte pour placer le signalement');
 }
 
 onMounted(() => {
-  const map = L.map('map').setView([-18.879, 47.508], 13);
+  map = L.map('map').setView([-18.879, 47.508], 13);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
-  // ➕ Markers
-  signalements.forEach((s) => {
-    L.marker([s.lat, s.lng], { icon: getIcon(s.statut) })
+  // Markers existants
+  signalements.forEach(s => {
+    L.marker([s.lat, s.lng]).addTo(map);
+  });
+
+  // 🎯 Clic carte
+  map.on('click', (e: any) => {
+    if (!modeSignalement.value) return;
+
+    if (nouveauMarker) {
+      map.removeLayer(nouveauMarker);
+    }
+
+    nouveauMarker = L.marker(e.latlng)
       .addTo(map)
       .bindPopup(`
-        <strong>Date :</strong> ${s.date}<br/>
-        <strong>Statut :</strong> ${s.statut}<br/>
-        <strong>Surface :</strong> ${s.surface} m²<br/>
-        <strong>Budget :</strong> ${s.budget} Ar
-      `);
+        <strong>Nouveau signalement</strong><br/>
+        Latitude : ${e.latlng.lat.toFixed(5)}<br/>
+        Longitude : ${e.latlng.lng.toFixed(5)}
+      `)
+      .openPopup();
+
+    modeSignalement.value = false;
   });
 });
 </script>
 
 <style scoped>
-/* 📊 Récap */
 .recap {
   padding: 12px;
   background: #f4f4f4;
-  font-size: 15px;
   border-bottom: 1px solid #ddd;
 }
 
-/* 🗺️ Carte */
 #map {
-  height: calc(100vh - 160px);
+  height: calc(100vh - 220px);
   width: 100%;
 }
-
-/* 🎯 Markers */
-.marker {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid #fff;
-}
-.marker.red { background: red; }
-.marker.orange { background: orange; }
-.marker.green { background: green; }
 </style>
