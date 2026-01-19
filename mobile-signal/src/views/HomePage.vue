@@ -7,52 +7,64 @@
     </ion-header>
 
     <ion-content>
-      <!-- 📊 Récap -->
+      <!--  R�cap -->
       <div class="recap">
         <p><strong>Total :</strong> {{ totalSignalements }}</p>
-        <p><strong>Surface :</strong> {{ totalSurface }} m²</p>
+        <p><strong>Surface :</strong> {{ totalSurface }} m�</p>
         <p><strong>Budget :</strong> {{ totalBudget }} Ar</p>
         <p><strong>Avancement :</strong> {{ avancement }} %</p>
 
         <ion-button expand="block" color="primary" @click="activerSignalement">
-          ➕ Signaler
+           Signaler
         </ion-button>
       </div>
 
-      <!-- 🧾 Formulaire -->
-      <div class="form" v-if="showForm">
-        <ion-item>
-          <ion-label>Statut</ion-label>
-          <ion-select v-model="form.statut">
-            <ion-select-option value="nouveau">Nouveau</ion-select-option>
-            <ion-select-option value="en_cours">En cours</ion-select-option>
-            <ion-select-option value="termine">Terminé</ion-select-option>
-          </ion-select>
-        </ion-item>
+      <!-- Main container: Carte + Formulaire side-by-side -->
+      <div class="container">
+        <!--  Carte -->
+        <div id="map" class="map-container"></div>
 
-        <ion-item>
-          <ion-label position="floating">Surface (m²)</ion-label>
-          <ion-input type="number" v-model.number="form.surface"></ion-input>
-        </ion-item>
+        <!--  Formulaire � droite -->
+        <div class="form" v-if="showForm">
+          <h3>Nouveau signalement</h3>
+          <ion-item>
+            <ion-label>Statut</ion-label>
+            <ion-select v-model="form.statut">
+              <ion-select-option value="nouveau">Nouveau</ion-select-option>
+              <ion-select-option value="en_cours">En cours</ion-select-option>
+              <ion-select-option value="termine">Termin�</ion-select-option>
+            </ion-select>
+          </ion-item>
 
-        <ion-item>
-          <ion-label position="floating">Budget (Ar)</ion-label>
-          <ion-input type="number" v-model.number="form.budget"></ion-input>
-        </ion-item>
+          <ion-item>
+            <ion-label position="floating">Description</ion-label>
+            <ion-input v-model="form.description" placeholder="D�crivez le probl�me"></ion-input>
+          </ion-item>
 
-        <ion-button expand="block" color="success" @click="validerSignalement">
-          Valider le signalement
-        </ion-button>
+          <ion-item>
+            <ion-label position="floating">Surface (m�)</ion-label>
+            <ion-input type="number" v-model.number="form.surface"></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="floating">Budget (Ar)</ion-label>
+            <ion-input type="number" v-model.number="form.budget"></ion-input>
+          </ion-item>
+
+          <ion-button expand="block" color="success" @click="validerSignalement">
+             Valider
+          </ion-button>
+          <ion-button expand="block" color="medium" @click="showForm = false">
+             Annuler
+          </ion-button>
+        </div>
       </div>
-
-      <!-- 🗺️ Carte -->
-      <div id="map"></div>
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import {
   IonPage,
   IonHeader,
@@ -67,54 +79,39 @@ import {
   IonSelectOption
 } from '@ionic/vue';
 import L from 'leaflet';
+import { getFirestore, collection, addDoc, Timestamp, GeoPoint } from 'firebase/firestore';
+import { useCollection, useCurrentUser } from 'vuefire';
 
 /* =========================
-   📌 Données (locales)
+    Donn�es
    ========================= */
-const signalements = ref<any[]>([]);
+const db = getFirestore();
+const currentUser = useCurrentUser();
+
+//  R�cup�ration r�active des signalements depuis Firebase
+const signalements = useCollection(collection(db, 'signalements'));
 
 /* =========================
-   💾 OFFLINE STORAGE
+    R�cap
    ========================= */
-function sauvegarderLocal() {
-  localStorage.setItem('signalements', JSON.stringify(signalements.value));
-}
-
-function chargerLocal() {
-  const data = localStorage.getItem('signalements');
-  if (data) {
-    signalements.value = JSON.parse(data);
-  } else {
-    // données par défaut (1er lancement)
-    signalements.value = [
-      { lat: -18.879, lng: 47.508, statut: 'nouveau', surface: 120, budget: 1500000 },
-      { lat: -18.905, lng: 47.520, statut: 'en_cours', surface: 200, budget: 2500000 },
-      { lat: -18.860, lng: 47.490, statut: 'termine', surface: 300, budget: 3500000 }
-    ];
-  }
-}
-
-/* =========================
-   📊 Récap
-   ========================= */
-const totalSignalements = computed(() => signalements.value.length);
+const totalSignalements = computed(() => signalements.value?.length || 0);
 
 const totalSurface = computed(() =>
-  signalements.value.reduce((s, x) => s + x.surface, 0)
+  signalements.value?.reduce((s: number, x: any) => s + (x.surface || 0), 0) || 0
 );
 
 const totalBudget = computed(() =>
-  signalements.value.reduce((s, x) => s + x.budget, 0)
+  signalements.value?.reduce((s: number, x: any) => s + (x.budget || 0), 0) || 0
 );
 
 const avancement = computed(() => {
-  if (signalements.value.length === 0) return 0;
-  const t = signalements.value.filter(s => s.statut === 'termine').length;
+  if (!signalements.value || signalements.value.length === 0) return 0;
+  const t = signalements.value.filter((s: any) => s.status === 'termine').length;
   return Math.round((t / signalements.value.length) * 100);
 });
 
 /* =========================
-   🗺️ Carte & Formulaire
+    Carte & Formulaire
    ========================= */
 let map: L.Map;
 let nouveauMarker: L.Marker | null = null;
@@ -124,47 +121,100 @@ const positionTemp = ref<{ lat: number; lng: number } | null>(null);
 
 const form = ref({
   statut: 'nouveau',
+  description: '',
   surface: 0,
   budget: 0
 });
+
+//  Ic�nes personnalis�es par statut
+const markerIcons = {
+  nouveau: L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  }),
+  en_cours: L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  }),
+  termine: L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  })
+};
 
 function activerSignalement() {
   alert('Cliquez sur la carte pour choisir la position');
 }
 
-function validerSignalement() {
-  if (!positionTemp.value) return;
+async function validerSignalement() {
+  if (!positionTemp.value || !currentUser.value) return;
 
-  signalements.value.push({
-    lat: positionTemp.value.lat,
-    lng: positionTemp.value.lng,
-    statut: form.value.statut,
-    surface: form.value.surface,
-    budget: form.value.budget
-  });
+  try {
+    await addDoc(collection(db, 'signalements'), {
+      budget: form.value.budget,
+      date: Timestamp.now(),
+      descriptiotn: form.value.description,
+      position: new GeoPoint(positionTemp.value.lat, positionTemp.value.lng),
+      status: form.value.statut,
+      surface: form.value.surface,
+      user_id: currentUser.value.uid
+    });
 
-  sauvegarderLocal();
+    // reset
+    showForm.value = false;
+    form.value = { statut: 'nouveau', description: '', surface: 0, budget: 0 };
+    positionTemp.value = null;
 
-  showForm.value = false;
-  form.value = { statut: 'nouveau', surface: 0, budget: 0 };
-  positionTemp.value = null;
-
-  afficherMarkers();
+    if (nouveauMarker) {
+      map.removeLayer(nouveauMarker);
+      nouveauMarker = null;
+    }
+  } catch (error) {
+    console.error('Erreur lors de l\'ajout du signalement:', error);
+    alert('Erreur lors de l\'enregistrement');
+  }
 }
 
 function afficherMarkers() {
+  // Supprimer tous les markers existants
   map.eachLayer((layer: any) => {
     if (layer instanceof L.Marker) map.removeLayer(layer);
   });
 
-  signalements.value.forEach(s => {
-    L.marker([s.lat, s.lng]).addTo(map);
-  });
+  // Ajouter les markers depuis Firebase avec couleur selon status
+  if (signalements.value) {
+    signalements.value.forEach((s: any) => {
+      if (s.position && s.position.latitude && s.position.longitude) {
+        const icon = markerIcons[s.status as keyof typeof markerIcons] || markerIcons.nouveau;
+        const marker = L.marker([s.position.latitude, s.position.longitude], { icon });
+        
+        // Popup avec infos du signalement
+        marker.bindPopup(`
+          <b>Statut:</b> ${s.status}<br>
+          <b>Surface:</b> ${s.surface} m²<br>
+          <b>Budget:</b> ${s.budget} Ar<br>
+          <b>Date:</b> ${s.date?.toDate?.().toLocaleDateString() || 'N/A'}
+        `);
+        
+        marker.addTo(map);
+      }
+    });
+  }
 }
 
 onMounted(() => {
-  chargerLocal();
-
   map = L.map('map').setView([-18.879, 47.508], 13);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -181,23 +231,76 @@ onMounted(() => {
     nouveauMarker = L.marker(e.latlng).addTo(map);
   });
 });
+
+//  Mettre � jour les markers quand les donn�es Firebase changent
+watch(signalements, () => {
+  if (map) afficherMarkers();
+});
 </script>
 
 <style scoped>
+/* Permet � ion-content de flex correctement */
+:deep(ion-content) {
+  --padding-bottom: 0;
+  --padding-top: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .recap {
   padding: 12px;
   background: #f4f4f4;
   border-bottom: 1px solid #ddd;
+  flex-shrink: 0;
+  z-index: 10;
 }
 
-.form {
-  padding: 12px;
-  background: #fff;
-  border-bottom: 1px solid #ddd;
+.recap p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.container {
+  display: flex;
+  flex: 1;
+  gap: 0;
+  height: 100%;
+  min-height: 500px;
+}
+
+.map-container {
+  flex: 1;
+  background: #e0e0e0;
+  min-width: 0;
+  position: relative;
 }
 
 #map {
-  height: calc(100vh - 360px);
   width: 100%;
+  height: 100%;
+}
+
+.form {
+  width: 350px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-left: 1px solid #ddd;
+  padding: 16px;
+  overflow-y: auto;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+}
+
+.form h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.form ion-item {
+  margin-bottom: 12px;
+}
+
+.form ion-button {
+  margin-top: 8px;
 }
 </style>
