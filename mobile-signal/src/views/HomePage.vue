@@ -7,7 +7,6 @@
     </ion-header>
 
     <ion-content>
-      <!-- Conteneur de la carte -->
       <div id="map"></div>
     </ion-content>
   </ion-page>
@@ -22,21 +21,23 @@ import {
   IonTitle,
   IonContent
 } from '@ionic/vue';
-
 import L from 'leaflet';
 
 onMounted(() => {
-  // 📍 Coordonnées Antananarivo
-  const lat = -18.879;
-  const lng = 47.508;
-  const zoom = 13;
+  const map = L.map('map').setView([-18.879, 47.508], 13);
 
-  const map = L.map('map').setView([lat, lng], zoom);
-
-  // 🗺️ Fond de carte OpenStreetMap
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
+
+  // 🔴 nouveau
+  L.marker([-18.879, 47.508]).addTo(map).bindPopup('Nouveau signalement');
+
+  // 🟠 en cours
+  L.marker([-18.905, 47.520]).addTo(map).bindPopup('Signalement en cours');
+
+  // 🟢 terminé
+  L.marker([-18.860, 47.490]).addTo(map).bindPopup('Signalement terminé');
 });
 </script>
 
