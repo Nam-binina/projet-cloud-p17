@@ -10,7 +10,7 @@
       <!--  R�cap -->
       <div class="recap">
         <p><strong>Total :</strong> {{ totalSignalements }}</p>
-        <p><strong>Surface :</strong> {{ totalSurface }} m�</p>
+        <p><strong>Surface :</strong> {{ totalSurface }} m²</p>
         <p><strong>Budget :</strong> {{ totalBudget }} Ar</p>
         <p><strong>Avancement :</strong> {{ avancement }} %</p>
 
@@ -32,17 +32,17 @@
             <ion-select v-model="form.statut">
               <ion-select-option value="nouveau">Nouveau</ion-select-option>
               <ion-select-option value="en_cours">En cours</ion-select-option>
-              <ion-select-option value="termine">Termin�</ion-select-option>
+              <ion-select-option value="termine">Termine</ion-select-option>
             </ion-select>
           </ion-item>
 
           <ion-item>
             <ion-label position="floating">Description</ion-label>
-            <ion-input v-model="form.description" placeholder="D�crivez le probl�me"></ion-input>
+            <ion-input v-model="form.description" placeholder="Decrivez le probleme"></ion-input>
           </ion-item>
 
           <ion-item>
-            <ion-label position="floating">Surface (m�)</ion-label>
+            <ion-label position="floating">Surface (m²)</ion-label>
             <ion-input type="number" v-model.number="form.surface"></ion-input>
           </ion-item>
 
@@ -221,6 +221,10 @@ onMounted(() => {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
+  setTimeout(() => {
+    map.invalidateSize();
+  }, 400);
+
   afficherMarkers();
 
   map.on('click', (e: any) => {
@@ -262,22 +266,22 @@ watch(signalements, () => {
 
 .container {
   display: flex;
-  flex: 1;
-  gap: 0;
-  height: 100%;
+  height: 100%; /* S'assure que le container prend toute la place */
   min-height: 500px;
+  width: 100%;
 }
 
 .map-container {
   flex: 1;
-  background: #e0e0e0;
-  min-width: 0;
+  height: 100%; /* Obligatoire pour que la carte remplisse sa zone */
   position: relative;
 }
 
 #map {
   width: 100%;
   height: 100%;
+  /* Empêche les bugs de débordement */
+  display: block; 
 }
 
 .form {
