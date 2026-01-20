@@ -1,0 +1,295 @@
+{
+	"info": {
+		"_postman_id": "auth-api-firebase-collection",
+		"name": "Auth API Firebase",
+		"description": "Collection pour tester l'API d'authentification Firebase",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Register User",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 201\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"",
+							"pm.test(\"Response contains success message\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.message).to.include(\"User created successfully\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"email\": \"{{test_email}}\",\n    \"password\": \"{{test_password}}\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/register",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"register"
+					]
+				},
+				"description": "Enregistre un nouvel utilisateur dans Firebase.\n\n**Body Parameters:**\n- `email` (string, required): Email de l'utilisateur\n- `password` (string, required): Mot de passe (min 6 caractères)\n\n**Response:**\n- 201: Utilisateur créé avec succès\n- 422: Paramètres manquants\n- 500: Erreur serveur"
+			},
+			"response": []
+		},
+		{
+			"name": "2. Login User",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Response contains token\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.userCredential).to.exist;",
+							"    pm.expect(jsonData.userCredential.user.uid).to.exist;",
+							"});",
+							"",
+							"// Sauvegarder le token pour les requêtes suivantes",
+							"var cookies = pm.cookies.get('access_token');",
+							"if (cookies) {",
+							"    pm.environment.set('access_token', cookies);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"email\": \"{{test_email}}\",\n    \"password\": \"{{test_password}}\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/login",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"login"
+					]
+				},
+				"description": "Connecte un utilisateur existant.\n\n**Body Parameters:**\n- `email` (string, required): Email de l'utilisateur\n- `password` (string, required): Mot de passe\n\n**Response:**\n- 200: Connexion réussie avec token JWT\n- 422: Paramètres manquants\n- 500: Identifiants invalides"
+			},
+			"response": []
+		},
+		{
+			"name": "3. Get Posts (Protected)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 or 401\", function () {",
+							"    pm.expect(pm.response.code).to.be.oneOf([200, 401]);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/posts",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"posts"
+					]
+				},
+				"description": "Route protégée nécessitant une authentification.\n\n**Headers:**\n- Cookie avec `access_token` (automatique après login)\n\n**Response:**\n- 200: Liste des posts\n- 401: Non authentifié"
+			},
+			"response": []
+		},
+		{
+			"name": "4. Logout User",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Response contains logout message\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.message).to.include(\"logged out\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/logout",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"logout"
+					]
+				},
+				"description": "Déconnecte l'utilisateur et supprime le cookie.\n\n**Response:**\n- 200: Déconnexion réussie\n- 500: Erreur serveur"
+			},
+			"response": []
+		},
+		{
+			"name": "5. Reset Password",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Response contains success message\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.message).to.include(\"Password reset email sent\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"email\": \"{{test_email}}\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/reset-password",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"reset-password"
+					]
+				},
+				"description": "Envoie un email de réinitialisation de mot de passe.\n\n**Body Parameters:**\n- `email` (string, required): Email de l'utilisateur\n\n**Response:**\n- 200: Email envoyé\n- 422: Email manquant\n- 500: Erreur serveur"
+			},
+			"response": []
+		},
+		{
+			"name": "0. Health Check",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						""
+					]
+				},
+				"description": "Vérifie que le serveur est en ligne."
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "test_email",
+			"value": "test@example.com",
+			"type": "string"
+		},
+		{
+			"key": "test_password",
+			"value": "Test123456!",
+			"type": "string"
+		}
+	]
+}

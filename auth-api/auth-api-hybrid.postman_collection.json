@@ -1,0 +1,335 @@
+{
+  "info": {
+    "name": "Auth API - Hybrid System",
+    "_postman_id": "auth-api-hybrid-collection",
+    "description": "Collection pour tester l'API d'authentification avec système hybride Firebase/PostgreSQL",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Hybrid Routes",
+      "item": [
+        {
+          "name": "Get Services Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has services info\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('services');",
+                  "    pm.expect(jsonData.services).to.have.property('firebase');",
+                  "    pm.expect(jsonData.services).to.have.property('postgresql');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "status"]
+            },
+            "description": "Vérifie le statut des services d'authentification (Firebase et PostgreSQL)"
+          },
+          "response": []
+        },
+        {
+          "name": "Register User (Hybrid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response indicates success\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData).to.have.property('provider');",
+                  "    pm.expect(jsonData).to.have.property('user');",
+                  "});",
+                  "",
+                  "pm.test(\"Provider is firebase or postgresql\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(['firebase', 'postgresql']).to.include(jsonData.provider);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "register"]
+            },
+            "description": "Enregistre un nouvel utilisateur avec fallback automatique Firebase -> PostgreSQL"
+          },
+          "response": []
+        },
+        {
+          "name": "Login User (Hybrid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains user info\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData).to.have.property('provider');",
+                  "    pm.expect(jsonData).to.have.property('user');",
+                  "});",
+                  "",
+                  "pm.test(\"Cookie is set\", function () {",
+                  "    pm.expect(pm.cookies.has('access_token')).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "login"]
+            },
+            "description": "Connecte un utilisateur avec fallback automatique Firebase -> PostgreSQL"
+          },
+          "response": []
+        },
+        {
+          "name": "Logout User (Hybrid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response indicates success\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "logout"]
+            },
+            "description": "Déconnecte l'utilisateur actuel"
+          },
+          "response": []
+        },
+        {
+          "name": "Reset Password (Hybrid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response indicates success\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData).to.have.property('provider');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{test_email}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/reset-password",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reset-password"]
+            },
+            "description": "Réinitialise le mot de passe avec fallback automatique Firebase -> PostgreSQL"
+          },
+          "response": []
+        }
+      ],
+      "description": "Routes avec fallback automatique Firebase -> PostgreSQL"
+    },
+    {
+      "name": "Firebase Only (Legacy)",
+      "item": [
+        {
+          "name": "Register User (Firebase)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/firebase/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "firebase", "register"]
+            },
+            "description": "Enregistre un utilisateur uniquement via Firebase (pas de fallback)"
+          },
+          "response": []
+        },
+        {
+          "name": "Login User (Firebase)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/firebase/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "firebase", "login"]
+            },
+            "description": "Connecte un utilisateur uniquement via Firebase"
+          },
+          "response": []
+        },
+        {
+          "name": "Logout User (Firebase)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/firebase/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "firebase", "logout"]
+            },
+            "description": "Déconnecte l'utilisateur de Firebase"
+          },
+          "response": []
+        },
+        {
+          "name": "Reset Password (Firebase)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{test_email}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/firebase/reset-password",
+              "host": ["{{base_url}}"],
+              "path": ["api", "firebase", "reset-password"]
+            },
+            "description": "Réinitialise le mot de passe via Firebase uniquement"
+          },
+          "response": []
+        }
+      ],
+      "description": "Routes Firebase uniquement (sans fallback)"
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "test_email",
+      "value": "test@example.com",
+      "type": "string"
+    },
+    {
+      "key": "test_password",
+      "value": "TestPassword123!",
+      "type": "string"
+    }
+  ]
+}
