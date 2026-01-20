@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import './Sidebar.css';
 
-const Sidebar = ({ onMenuClick, expanded: propExpanded = true, onToggle }) => {
+const Sidebar = ({ onMenuClick, expanded: propExpanded = true, onToggle, userData, onLogout }) => {
   const [activeMenu, setActiveMenu] = useState('Dashboard');
 
   const menuItems = [
     { name: 'Dashboard', icon: '⊞', submenu: ['Activity', 'Traffic', 'Statistic'] },
     { name: 'Customers', icon: '👥', link: 'customers' },
     { name: 'Reports', icon: '📋', link: 'reports' },
+    { name: 'Map', icon: '🗺️', link: 'map' },
     { name: 'Invoices', icon: '🧾' },
     { name: 'Wallet', icon: '💳' },
     { name: 'Notification', icon: '🔔' },
@@ -33,8 +34,8 @@ const Sidebar = ({ onMenuClick, expanded: propExpanded = true, onToggle }) => {
         <div className="profile-section">
           <div className="avatar">👤</div>
           <div className="profile-info">
-            <p className="profile-label">Project Designer</p>
-            <p className="profile-name">Andrew Smith</p>
+            <p className="profile-label">{userData?.userType === 'manager' ? 'Manager' : userData?.userType === 'user' ? 'User' : 'Visitor'}</p>
+            <p className="profile-name">{userData?.email || 'User'}</p>
           </div>
         </div>
         <button 
@@ -90,6 +91,15 @@ const Sidebar = ({ onMenuClick, expanded: propExpanded = true, onToggle }) => {
         {propExpanded && <p className="footer-subtext">Creating or adding new tasks couldn't be easier</p>}
         <button className="add-task-btn">
           <span>+</span> {propExpanded && 'Add New Task'}
+        </button>
+        
+        {/* Logout Button */}
+        <button 
+          className="logout-btn"
+          onClick={onLogout}
+          title="Logout"
+        >
+          <span>🚪</span> {propExpanded && 'Logout'}
         </button>
       </div>
     </div>

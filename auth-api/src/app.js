@@ -10,7 +10,7 @@ const SERVER_HOST = process.env.SERVER_HOST || '0.0.0.0';
 const app = express();
 
 app.use(cors({
-    origin: ['http://localhost:5173'], 
+    origin: ['http://localhost:5173', 'http://localhost', 'http://localhost:80', 'http://localhost:3000', process.env.FRONTEND_URL || '*'], 
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true  
 }));

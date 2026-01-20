@@ -1,15 +1,73 @@
 import { useState } from 'react';
 import './Login.css';
+import { loginUser, registerUser, isOnline } from '../services/authService';
 
 const Login = ({ onLogin }) => {
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [userType, setUserType] = useState('visitor');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState(isOnline() ? 'online' : 'offline');
 
-  const handleSubmit = (e) => {
+  // Listen to online/offline events
+  useState(() => {
+    const handleOnline = () => setConnectionStatus('online');
+    const handleOffline = () => setConnectionStatus('offline');
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Pour le moment, just call onLogin
-    onLogin();
+    setError('');
+    setLoading(true);
+
+    try {
+      if (isRegisterMode) {
+        // Registration mode
+        if (password !== confirmPassword) {
+          setError('Passwords do not match');
+          setLoading(false);
+          return;
+        }
+        if (password.length < 8) {
+          setError('Password must be at least 8 characters long');
+          setLoading(false);
+          return;
+        }
+        
+        const result = await registerUser(username, password, userType);
+        if (result.success) {
+          console.log('Registration successful with provider:', result.data.provider);
+          onLogin(result.data);
+        } else {
+          setError(result.error || 'Registration failed');
+        }
+      } else {
+        // Login mode
+        const result = await loginUser(username, password, userType);
+        
+        if (result.success) {
+          console.log('Login successful with provider:', result.data.provider);
+          onLogin(result.data);
+        } else {
+          setError(result.error || 'Login failed');
+        }
+      }
+    } catch (err) {
+      setError(err.message || 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -34,6 +92,14 @@ const Login = ({ onLogin }) => {
             <circle cx="100" cy="140" r="25" fill="url(#pinGradient)" />
           </svg>
         </div>
+
+        {/* Connection Status Indicator */}
+        <div className="connection-status">
+          <span className={`status-dot ${connectionStatus}`}></span>
+          <span className="status-text">
+            {connectionStatus === 'online' ? '🔗 Connected (Firebase/PostgreSQL)' : '📴 Offline (PostgreSQL only)'}
+          </span>
+        </div>
       </div>
 
       {/* Right side - Login Form */}
@@ -41,22 +107,32 @@ const Login = ({ onLogin }) => {
         <div className="login-card">
           {/* Header */}
           <div className="login-header">
-            <h1>Login</h1>
+            <h1>{isRegisterMode ? 'Register' : 'Login'}</h1>
+            <p>{isRegisterMode ? 'Create a new account' : 'Secure authentication with Firebase & PostgreSQL'}</p>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="error-message">
+              <span className="error-icon">⚠️</span>
+              <span>{error}</span>
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="login-form">
-            {/* Username Field */}
+            {/* Email Field */}
             <div className="form-group">
-              <label htmlFor="username" className="form-label">Username</label>
+              <label htmlFor="username" className="form-label">Email</label>
               <input
-                type="text"
+                type="email"
                 id="username"
                 className="form-input"
-                placeholder="Enter your username"
+                placeholder="Enter your email"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
 
@@ -71,18 +147,61 @@ const Login = ({ onLogin }) => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
 
+            {/* Confirm Password Field (Register only) */}
+            {isRegisterMode && (
+              <div className="form-group">
+                <label htmlFor="confirmPassword" className="form-label">Confirm Password</label>
+                <input
+                  type="password"
+                  id="confirmPassword"
+                  className="form-input"
+                  placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+            )}
+
             {/* Submit Button */}
-            <button type="submit" className="submit-btn">
-              Submit
+            <button type="submit" className="submit-btn" disabled={loading}>
+              {loading ? (
+                <>
+                  <span className="spinner"></span>
+                  {isRegisterMode ? 'Registering...' : 'Logging in...'}
+                </>
+              ) : (
+                isRegisterMode ? 'Create Account' : 'Login'
+              )}
             </button>
+
+            {/* Toggle Login/Register Link */}
+            <div className="auth-toggle">
+              <p>
+                {isRegisterMode ? 'Already have an account? ' : "Don't have an account? "}
+                <button
+                  type="button"
+                  className="toggle-link"
+                  onClick={() => {
+                    setIsRegisterMode(!isRegisterMode);
+                    setError('');
+                    setConfirmPassword('');
+                  }}
+                >
+                  {isRegisterMode ? 'Login here' : 'Register here'}
+                </button>
+              </p>
+            </div>
           </form>
 
           {/* User Type Selection */}
           <div className="user-type-section">
-            <p className="user-type-label">Visiteur</p>
+            <p className="user-type-label">Select User Type</p>
             <div className="user-type-buttons">
               <label className="radio-option">
                 <input
@@ -90,8 +209,9 @@ const Login = ({ onLogin }) => {
                   value="visitor"
                   checked={userType === 'visitor'}
                   onChange={(e) => setUserType(e.target.value)}
+                  disabled={loading}
                 />
-                <span>Visiteur</span>
+                <span>👁️ Visiteur</span>
               </label>
               <label className="radio-option">
                 <input
@@ -99,8 +219,9 @@ const Login = ({ onLogin }) => {
                   value="user"
                   checked={userType === 'user'}
                   onChange={(e) => setUserType(e.target.value)}
+                  disabled={loading}
                 />
-                <span>Utilisateur</span>
+                <span>👤 Utilisateur</span>
               </label>
               <label className="radio-option">
                 <input
@@ -108,9 +229,19 @@ const Login = ({ onLogin }) => {
                   value="manager"
                   checked={userType === 'manager'}
                   onChange={(e) => setUserType(e.target.value)}
+                  disabled={loading}
                 />
-                <span>Manager</span>
+                <span>👨‍💼 Manager</span>
               </label>
+            </div>
+          </div>
+
+          {/* Demo Credentials */}
+          <div className="demo-section">
+            <p className="demo-label">Demo Credentials</p>
+            <div className="demo-creds">
+              <small>Email: demo@example.com</small>
+              <small>Password: demo123456</small>
             </div>
           </div>
         </div>
