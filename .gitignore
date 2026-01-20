@@ -49,6 +49,8 @@ auth-api/node_modules/
 auth-api/dist/
 auth-api/.env
 auth-api/coverage/
+# auth-api/firebase-service-account.json
+# auth-api/auth.db
 
 # =====================================
 # Module cartes (Docker + données OSM)
