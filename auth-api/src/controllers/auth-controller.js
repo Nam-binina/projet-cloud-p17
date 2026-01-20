@@ -1,15 +1,10 @@
-// src/controllers/auth-controller.js
 const authService = require("../services/auth.service");
 
 class AuthController {
-  /**
-   * Enregistre un nouvel utilisateur
-   */
   async registerUser(req, res) {
     try {
       const { email, password } = req.body;
-      
-      // Validation
+
       if (!email || !password) {
         return res.status(422).json({
           error: "Email et mot de passe requis",
@@ -18,7 +13,6 @@ class AuthController {
         });
       }
 
-      // Enregistrer l'utilisateur
       const result = await authService.registerUser(email, password);
 
       return res.status(201).json({
@@ -36,14 +30,10 @@ class AuthController {
     }
   }
 
-  /**
-   * Connecte un utilisateur
-   */
   async loginUser(req, res) {
     try {
       const { email, password } = req.body;
-      
-      // Validation
+
       if (!email || !password) {
         return res.status(422).json({
           error: "Email et mot de passe requis",
@@ -52,15 +42,13 @@ class AuthController {
         });
       }
 
-      // Connecter l'utilisateur
       const result = await authService.loginUser(email, password);
 
-      // Définir le cookie avec le token
       if (result.idToken) {
         res.cookie('access_token', result.idToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
-          maxAge: 24 * 60 * 60 * 1000 // 24 heures
+          maxAge: 24 * 60 * 60 * 1000
         });
       }
 
@@ -79,14 +67,10 @@ class AuthController {
     }
   }
 
-  /**
-   * Déconnecte un utilisateur
-   */
   async logoutUser(req, res) {
     try {
       const result = await authService.logoutUser();
 
-      // Effacer le cookie
       res.clearCookie('access_token');
 
       return res.status(200).json({
@@ -103,14 +87,27 @@ class AuthController {
     }
   }
 
-  /**
-   * Réinitialise le mot de passe
-   */
-  async resetPassword(req, res) {
+  async getAllUsers(req, res) {
     try {
-      const { email } = req.body;
-      
-      // Validation
+      const users = await authService.listUsers();
+
+      return res.status(200).json({
+        success: true,
+        users
+      });
+
+    } catch (error) {
+      console.error("Erreur lors de la récupération des utilisateurs :", error);
+      return res.status(500).json({
+        error: error.message || "Impossible de récupérer les utilisateurs"
+      });
+    }
+  }
+
+  async blockUser(req, res) {
+    try {
+      const { email, durationMinutes } = req.body;
+
       if (!email) {
         return res.status(422).json({
           error: "Email requis",
@@ -118,14 +115,67 @@ class AuthController {
         });
       }
 
-      // Réinitialiser le mot de passe
+      const result = await authService.blockUser(email, durationMinutes);
+
+      return res.status(200).json({
+        success: true,
+        message: result.message,
+        blockedUntil: result.blockedUntil
+      });
+
+    } catch (error) {
+      console.error("Erreur lors du blocage:", error);
+      return res.status(500).json({
+        error: error.message || "Une erreur est survenue lors du blocage"
+      });
+    }
+  }
+
+
+  async unblockUser(req, res) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(422).json({
+          error: "Email requis",
+          email: "Email requis"
+        });
+      }
+
+      const result = await authService.unblockUser(email);
+
+      return res.status(200).json({
+        success: true,
+        message: result.message
+      });
+
+    } catch (error) {
+      console.error("Erreur lors du déblocage:", error);
+      return res.status(500).json({
+        error: error.message || "Une erreur est survenue lors du déblocage"
+      });
+    }
+  }
+
+  async resetPassword(req, res) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(422).json({
+          error: "Email requis",
+          email: "Email requis"
+        });
+      }
+
       const result = await authService.resetPassword(email);
 
       return res.status(200).json({
         success: true,
         message: result.message,
         provider: result.provider,
-        tempPassword: result.tempPassword // Seulement pour PostgreSQL
+        tempPassword: result.tempPassword
       });
 
     } catch (error) {
@@ -135,14 +185,11 @@ class AuthController {
       });
     }
   }
-
-  /**
-   * Obtient le statut des services d'authentification
-   */
+  er
   async getStatus(req, res) {
     try {
       const status = await authService.getServicesStatus();
-      
+
       return res.status(200).json({
         success: true,
         services: status
@@ -156,5 +203,7 @@ class AuthController {
     }
   }
 }
+
+
 
 module.exports = new AuthController();

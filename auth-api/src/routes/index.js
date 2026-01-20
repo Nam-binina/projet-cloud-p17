@@ -12,8 +12,10 @@ router.post('/api/login', authController.loginUser);
 router.post('/api/logout', authController.logoutUser);
 router.post('/api/reset-password', authController.resetPassword);
 router.get('/api/auth/status', authController.getStatus);
+router.post('/api/firebase/block-user',authController.blockUser);
+router.post('/api/firebase/unblock-user',authController.unblockUser);
+router.get('/api/users',authController.getAllUsers);
 
-// Routes Firebase uniquement (legacy)
 router.post('/api/firebase/register', firebaseAuthController.registerUser);
 router.post('/api/firebase/login', firebaseAuthController.loginUser);
 router.post('/api/firebase/logout', firebaseAuthController.logoutUser);

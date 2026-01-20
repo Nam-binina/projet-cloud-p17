@@ -1,6 +1,5 @@
 require("dotenv").config();
 const firebase = require("firebase/app");
-const admin = require('firebase-admin');
 const path = require('path');
 const { 
   getAuth, 
@@ -16,9 +15,9 @@ const {
 const serviceAccountPath = path.resolve(__dirname, '../../', process.env.FIREBASE_SERVICE_ACCOUNT || 'firebase-service-account.json');
 const serviceAccount = require(serviceAccountPath);
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+// admin.initializeApp({
+//   credential: admin.credential.cert(serviceAccount),
+// });
 
 
 const firebaseConfig = {
@@ -41,5 +40,5 @@ module.exports = {
   signOut,
   sendEmailVerification,
   sendPasswordResetEmail,
-  admin
+  // admin
 };
