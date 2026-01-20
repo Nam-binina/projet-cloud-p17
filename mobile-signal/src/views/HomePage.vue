@@ -3,6 +3,13 @@
     <ion-header>
       <ion-toolbar>
         <ion-title>Signalements</ion-title>
+
+        <ion-buttons slot="end">
+          <ion-button color="danger" @click="handleLogout">
+            Déconnexion
+            <ion-icon slot="end" :icon="logOutOutline"></ion-icon>
+          </ion-button>
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
 
@@ -81,6 +88,13 @@ import {
 import L from 'leaflet';
 import { getFirestore, collection, addDoc, Timestamp, GeoPoint } from 'firebase/firestore';
 import { useCollection, useCurrentUser } from 'vuefire';
+import { getAuth, signOut } from 'firebase/auth';
+import { useFirebaseAuth } from 'vuefire';
+import { logOutOutline } from 'ionicons/icons';
+import { useRouter } from 'vue-router';
+
+const auth = useFirebaseAuth();
+const router = useRouter();
 
 /* =========================
     Donn�es
@@ -109,6 +123,18 @@ const avancement = computed(() => {
   const t = signalements.value.filter((s: any) => s.status === 'termine').length;
   return Math.round((t / signalements.value.length) * 100);
 });
+
+async function handleLogout() {
+  if (auth) {
+    try {
+      await signOut(auth);
+      // Optionnel : Rediriger l'utilisateur vers la page de login après déconnexion
+      router.push('/login'); 
+    } catch (error) {
+      console.error("Erreur lors de la déconnexion :", error);
+    }
+  }
+}
 
 /* =========================
     Carte & Formulaire
