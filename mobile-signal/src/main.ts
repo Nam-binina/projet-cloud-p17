@@ -29,13 +29,13 @@ import { initializeApp } from 'firebase/app';
 import { defineCustomElements } from '@ionic/pwa-elements/loader'; 
 
 const firebaseApp = initializeApp({
-  apiKey: "AIzaSyAQCjw0jzH3z36_Px5knH9YWQOVIUOkvIA",
-  authDomain: "firstprojectfirebase-5c25f.firebaseapp.com",
-  projectId: "firstprojectfirebase-5c25f",
-  storageBucket: "firstprojectfirebase-5c25f.firebasestorage.app",
-  messagingSenderId: "958645113026",
-  appId: "1:958645113026:web:99abe637d3243da83a2b5b",
-  measurementId: "G-5DVS5168ZY"
+  apiKey: "AIzaSyBzSlcosNbw5tYECjQSxWZQwadapUTcofc",
+  authDomain: "tp-cloud-558c7.firebaseapp.com",
+  projectId: "tp-cloud-558c7",
+  storageBucket: "tp-cloud-558c7.firebasestorage.app",
+  messagingSenderId: "1094412939113",
+  appId: "1:1094412939113:web:6bd86e5c3195d742d9d7f8",
+  measurementId: "G-FSD7FCTLVS"
 });
 
 // Ajout ici : Initialisation des éléments de la caméra

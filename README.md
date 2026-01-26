@@ -19,3 +19,10 @@ npm run dev
 ### Connexion
 - Sur l'écran `Login`, entrez un email et mot de passe d'un utilisateur existant dans votre projet Firebase.
 - En cas de succès, vous êtes redirigé vers `/home`. Les routes protégées redirigent vers `/login` si non authentifié.
+
+## trasformer le code en apk android 
+1. npm run build
+2. npx cap sync
+* -------------- *
+si sa ne marche pas installer ionic globalement
+3. npm install -g @ionic/cli
