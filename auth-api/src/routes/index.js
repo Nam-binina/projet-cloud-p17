@@ -25,10 +25,12 @@ router.post('/api/firebase/reset-password', firebaseAuthController.resetPassword
 
 
 router.get("/api/signalements", signalementController.list);
+router.get("/api/signalements/user/:userId", signalementController.getByUserId);
 router.get("/api/signalements/:id", signalementController.get);
 router.post("/api/signalements", signalementController.create);
 router.put("/api/signalements/:id", signalementController.update);
 router.delete("/api/signalements/:id", signalementController.delete);
+router.post("/api/signalements/cleanup/timestamps", signalementController.cleanupTimestamps);
 
 router.get('/api/posts', verifyToken, PostsController.getPosts);
 

@@ -142,6 +142,47 @@ class SignalementController {
       });
     }
   }
+
+  async getByUserId(req, res) {
+    try {
+      const { userId } = req.params;
+
+      if (!userId) {
+        return res.status(422).json({
+          error: "User ID requis"
+        });
+      }
+
+      const signalements = await signalementService.getSignalementsByUserId(userId);
+
+      return res.status(200).json({
+        success: true,
+        signalements
+      });
+
+    } catch (error) {
+      console.error("Erreur lors de la récupération des signalements utilisateur :", error);
+      return res.status(500).json({
+        error: error.message || "Impossible de récupérer les signalements"
+      });
+    }
+  }
+
+  async cleanupTimestamps(req, res) {
+    try {
+      const result = await signalementService.cleanupTimestamps();
+      return res.status(200).json({
+        success: true,
+        message: `${result.cleaned} documents nettoyés`,
+        result
+      });
+    } catch (error) {
+      console.error("Erreur cleanup :", error);
+      return res.status(500).json({
+        error: error.message || "Erreur lors du nettoyage"
+      });
+    }
+  }
 }
 
 module.exports = new SignalementController();

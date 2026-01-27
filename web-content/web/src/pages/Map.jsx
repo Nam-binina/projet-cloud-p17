@@ -6,8 +6,13 @@ const Map = () => {
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [clickedLocation, setClickedLocation] = useState(null);
   const [showSignalementForm, setShowSignalementForm] = useState(false);
+  const [signalements, setSignalements] = useState([]);
+  const [mySignalements, setMySignalements] = useState([]);
+  const [showMySignalements, setShowMySignalements] = useState(false);
+  const [loadingSignalements, setLoadingSignalements] = useState(false);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
+  const markersRef = useRef([]);
 
   useEffect(() => {
     // Load Leaflet CSS and JS only once
@@ -26,13 +31,17 @@ const Map = () => {
       leafletScript.onload = () => {
         console.log('Leaflet JS loaded successfully');
         // Small delay to ensure Leaflet is fully initialized
-        setTimeout(() => initializeMap(), 100);
+        setTimeout(() => {
+          initializeMap();
+          loadAllSignalements();
+        }, 100);
       };
       leafletScript.onerror = () => console.error('Failed to load Leaflet JS');
       document.body.appendChild(leafletScript);
     } else {
       console.log('Leaflet already loaded');
       initializeMap();
+      loadAllSignalements();
     }
 
     return () => {
@@ -108,72 +117,72 @@ const Map = () => {
     tileLayer.addTo(map);
 
     const locations = [
-      { 
-        id: 1, 
-        name: 'Terrain Centre-Ville', 
-        lat: -18.8792, 
-        lng: 47.5079, 
-        company: 'TechBuild Corp',
-        date: '2025-01-15',
-        status: 'En cours',
-        surface: 5240,
-        budget: 125000
-      },
-      { 
-        id: 2, 
-        name: 'Zone Industrielle Nord', 
-        lat: -18.8650, 
-        lng: 47.5200, 
-        company: 'ConstructPro Ltd',
-        date: '2025-02-10',
-        status: 'Planifié',
-        surface: 8500,
-        budget: 250000
-      },
-      { 
-        id: 3, 
-        name: 'Quartier Résidentiel Est', 
-        lat: -18.8900, 
-        lng: 47.5350, 
-        company: 'BuildCare Solutions',
-        date: '2024-12-20',
-        status: 'Complété',
-        surface: 3200,
-        budget: 85000
-      },
-      { 
-        id: 4, 
-        name: 'Centre Commercial Ouest', 
-        lat: -18.8750, 
-        lng: 47.4950, 
-        company: 'Commerce Dev Inc',
-        date: '2025-03-05',
-        status: 'En cours',
-        surface: 12000,
-        budget: 450000
-      },
-      { 
-        id: 5, 
-        name: 'Parc Technologique Sud', 
-        lat: -18.8950, 
-        lng: 47.5150, 
-        company: 'TechPark Builders',
-        date: '2025-01-22',
-        status: 'En attente',
-        surface: 15000,
-        budget: 620000
-      },
-      { 
-        id: 6, 
-        name: 'Zone d\'Expansion Urbaine', 
-        lat: -18.8650, 
-        lng: 47.4850, 
-        company: 'Urban Development Co',
-        date: '2025-04-01',
-        status: 'Planifié',
-        surface: 20000,
-        budget: 800000
-      },
+      // { 
+      //   id: 1, 
+      //   name: 'Terrain Centre-Ville', 
+      //   lat: -18.8792, 
+      //   lng: 47.5079, 
+      //   company: 'TechBuild Corp',
+      //   date: '2025-01-15',
+      //   status: 'En cours',
+      //   surface: 5240,
+      //   budget: 125000
+      // },
+      // { 
+      //   id: 2, 
+      //   name: 'Zone Industrielle Nord', 
+      //   lat: -18.8650, 
+      //   lng: 47.5200, 
+      //   company: 'ConstructPro Ltd',
+      //   date: '2025-02-10',
+      //   status: 'Planifié',
+      //   surface: 8500,
+      //   budget: 250000
+      // },
+      // { 
+      //   id: 3, 
+      //   name: 'Quartier Résidentiel Est', 
+      //   lat: -18.8900, 
+      //   lng: 47.5350, 
+      //   company: 'BuildCare Solutions',
+      //   date: '2024-12-20',
+      //   status: 'Complété',
+      //   surface: 3200,
+      //   budget: 85000
+      // },
+      // { 
+      //   id: 4, 
+      //   name: 'Centre Commercial Ouest', 
+      //   lat: -18.8750, 
+      //   lng: 47.4950, 
+      //   company: 'Commerce Dev Inc',
+      //   date: '2025-03-05',
+      //   status: 'En cours',
+      //   surface: 12000,
+      //   budget: 450000
+      // },
+      // { 
+      //   id: 5, 
+      //   name: 'Parc Technologique Sud', 
+      //   lat: -18.8950, 
+      //   lng: 47.5150, 
+      //   company: 'TechPark Builders',
+      //   date: '2025-01-22',
+      //   status: 'En attente',
+      //   surface: 15000,
+      //   budget: 620000
+      // },
+      // { 
+      //   id: 6, 
+      //   name: 'Zone d\'Expansion Urbaine', 
+      //   lat: -18.8650, 
+      //   lng: 47.4850, 
+      //   company: 'Urban Development Co',
+      //   date: '2025-04-01',
+      //   status: 'Planifié',
+      //   surface: 20000,
+      //   budget: 800000
+      // },
     ];
 
     // Add markers
@@ -258,6 +267,216 @@ const Map = () => {
     });
   };
 
+  // Charger tous les signalements
+  const loadAllSignalements = async () => {
+    try {
+      setLoadingSignalements(true);
+      const response = await fetch('http://localhost:3000/api/signalements');
+      const data = await response.json();
+
+      if (data.success && data.signalements) {
+        setSignalements(data.signalements);
+        displaySignalements(data.signalements);
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des signalements:', error);
+    } finally {
+      setLoadingSignalements(false);
+    }
+  };
+
+  // Charger les signalements de l'utilisateur
+  const loadMySignalements = async () => {
+    try {
+      setLoadingSignalements(true);
+      const authData = JSON.parse(localStorage.getItem('authData') || '{}');
+      const userId = authData.uid;
+
+      if (!userId) {
+        console.error('User ID not found');
+        return;
+      }
+
+      const response = await fetch(`http://localhost:3000/api/signalements/user/${userId}`);
+      const data = await response.json();
+
+      if (data.success && data.signalements) {
+        setMySignalements(data.signalements);
+        setShowMySignalements(true);
+        displaySignalements(data.signalements);
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des signalements:', error);
+    } finally {
+      setLoadingSignalements(false);
+    }
+  };
+
+  // Afficher les signalements sur la carte
+  // Fonction pour parser la position - supporte 4 formats: GeoPoint {latitude, longitude}, array [lat, lng], string avec degrés, et objet {lat, lng}
+  const parsePosition = (position) => {
+    if (!position) {
+      return null;
+    }
+    
+    // Format GeoPoint Firebase {latitude, longitude}
+    if (typeof position === 'object' && 
+        (position.latitude !== undefined && position.longitude !== undefined)) {
+      const lat = parseFloat(position.latitude);
+      const lng = parseFloat(position.longitude);
+      
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return { lat, lng };
+      }
+    }
+    
+    // Format objet ancien {lat, lng}
+    if (typeof position === 'object' && position.lat !== undefined && position.lng !== undefined) {
+      return { lat: position.lat, lng: position.lng };
+    }
+    
+    // Format array [lat, lng] - nombres
+    if (Array.isArray(position) && position.length === 2) {
+      const lat = parseFloat(position[0]);
+      const lng = parseFloat(position[1]);
+      
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return { lat, lng };
+      }
+    }
+    
+    // Format string "[18.87° S, 47.53° E]" ou "18.87° S, 47.53° E"
+    if (typeof position === 'string') {
+      // Essayer d'abord le format avec crochets
+      let regex = /\[(-?\d+\.?\d*?)° ([NS]),\s*(-?\d+\.?\d*?)° ([EW])\]/;
+      let match = position.match(regex);
+      
+      // Si pas de crochets, essayer sans
+      if (!match) {
+        regex = /(-?\d+\.?\d*?)° ([NS]),\s*(-?\d+\.?\d*?)° ([EW])/;
+        match = position.match(regex);
+      }
+      
+      if (!match) {
+        console.warn('Position string format non valide:', position);
+        return null;
+      }
+      
+      let lat = parseFloat(match[1]);
+      const latDir = match[2];
+      let lng = parseFloat(match[3]);
+      const lngDir = match[4];
+      
+      // Appliquer les directions
+      if (latDir === 'S') lat = -lat;
+      if (lngDir === 'W') lng = -lng;
+      
+      return { lat, lng };
+    }
+    
+    return null;
+  };
+
+  const displaySignalements = (signalementList) => {
+    const L = window.L;
+    
+    // Nettoyer les anciens marqueurs
+    markersRef.current.forEach(marker => marker.remove());
+    markersRef.current = [];
+
+    if (!mapInstanceRef.current) return;
+
+    const map = mapInstanceRef.current;
+    const statusColors = {
+      'en_attente': '#FFA500',
+      'planifie': '#4169E1',
+      'en_cours': '#32CD32',
+      'termine': '#228B22'
+    };
+
+    // Fonction pour créer une icône personnalisée
+    const createCustomIcon = (color) => {
+      return L.divIcon({
+        className: 'custom-marker',
+        html: `
+          <div style="
+            background-color: ${color};
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            cursor: pointer;
+          ">
+            📍
+          </div>
+        `,
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32]
+      });
+    };
+
+    signalementList.forEach((signalement) => {
+      try {
+        // Parser la position - supporte les 2 formats
+        const parsed = parsePosition(signalement.position);
+        if (!parsed) return;
+        
+        const lat = parsed.lat;
+        const lng = parsed.lng;
+
+        const color = statusColors[signalement.status] || '#FF6347';
+        const marker = L.marker([lat, lng], {
+          icon: createCustomIcon(color),
+          title: signalement.description
+        }).addTo(map);
+
+        markersRef.current.push(marker);
+
+        marker.bindPopup(`
+          <div class="map-popup">
+            <h4>${signalement.description}</h4>
+            <div class="popup-grid">
+              <div class="popup-item">
+                <span class="popup-label">Date:</span>
+                <span class="popup-value">${new Date(signalement.date).toLocaleDateString('fr-FR')}</span>
+              </div>
+              <div class="popup-item">
+                <span class="popup-label">Statut:</span>
+                <span class="popup-value" style="color: ${color}">${signalement.status}</span>
+              </div>
+              <div class="popup-item">
+                <span class="popup-label">Surface:</span>
+                <span class="popup-value">${signalement.surface.toLocaleString()} m²</span>
+              </div>
+              <div class="popup-item">
+                <span class="popup-label">Budget:</span>
+                <span class="popup-value">${signalement.budget.toLocaleString()} MGA</span>
+              </div>
+              <div class="popup-item">
+                <span class="popup-label">Entreprise:</span>
+                <span class="popup-value">${signalement.entreprise}</span>
+              </div>
+            </div>
+          </div>
+        `);
+      } catch (error) {
+        console.error('Error adding signalement marker:', error);
+      }
+    });
+  };
+
+  const clearSignalements = () => {
+    setShowMySignalements(false);
+    setMySignalements([]);
+    displaySignalements(signalements);
+  };
+
   return (
     <div className="map-page">
       <div className="map-container">
@@ -269,8 +488,8 @@ const Map = () => {
           </div>
           <div className="map-stats">
             <div className="map-stat">
-              <span className="stat-number">6</span>
-              <span className="stat-label">Projets</span>
+              <span className="stat-number">{showMySignalements ? mySignalements.length : signalements.length}</span>
+              <span className="stat-label">{showMySignalements ? 'Mes projets' : 'Total projets'}</span>
             </div>
             <div className="map-stat">
               <span className="stat-number">63,940 m²</span>
@@ -280,6 +499,15 @@ const Map = () => {
               <span className="stat-number">2.2M MGA</span>
               <span className="stat-label">Budget total</span>
             </div>
+          </div>
+          <div className="header-actions">
+            <button 
+              className={`filter-btn ${showMySignalements ? 'active' : ''}`}
+              onClick={showMySignalements ? clearSignalements : loadMySignalements}
+              disabled={loadingSignalements}
+            >
+              {loadingSignalements ? '⏳' : showMySignalements ? '✓' : '👤'} {showMySignalements ? 'Voir tous' : 'Mes projets'}
+            </button>
           </div>
         </div>
 

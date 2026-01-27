@@ -57,6 +57,14 @@ const SignalementForm = ({ location, onClose, onSubmit }) => {
     setError(null);
 
     try {
+      // Formater la position comme un GeoPoint Firebase
+      const formatPosition = (lat, lng) => {
+        return {
+          latitude: parseFloat(lat.toFixed(14)),
+          longitude: parseFloat(lng.toFixed(14))
+        };
+      };
+
       // Préparer les données au format attendu
       const payload = {
         description: formData.description,
@@ -64,10 +72,7 @@ const SignalementForm = ({ location, onClose, onSubmit }) => {
         budget: formData.budget,
         entreprise: formData.entreprise,
         status: formData.status,
-        position: {
-          lat: formData.position.lat,
-          lng: formData.position.lng
-        },
+        position: formatPosition(formData.position.lat, formData.position.lng),
         date: formData.date,
         user_id: formData.user_id
       };
@@ -265,7 +270,10 @@ const SignalementForm = ({ location, onClose, onSubmit }) => {
   budget: formData.budget || 'vide',
   entreprise: formData.entreprise || 'vide',
   status: formData.status,
-  position: `[${formData.position.lat}° S, ${formData.position.lng}° E]`,
+  position: {
+    latitude: parseFloat(formData.position.lat.toFixed(14)),
+    longitude: parseFloat(formData.position.lng.toFixed(14))
+  },
   date: formData.date,
   user_id: formData.user_id || 'vide'
 }, null, 2)}

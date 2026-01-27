@@ -5,14 +5,8 @@ class SignalementService {
 
     async listSignalements(limit = 50, startAfterId = null) {
         try {
-            let query = db.collection("signalements").orderBy("createdAt", "desc").limit(limit);
-
-            if (startAfterId) {
-                const lastDoc = await db.collection("signalements").doc(startAfterId).get();
-                if (lastDoc.exists) {
-                    query = query.startAfter(lastDoc);
-                }
-            }
+            // Récupérer tous les signalements sans ordre (pour éviter les problèmes d'index)
+            let query = db.collection("signalements");
 
             const snapshot = await query.get();
 
@@ -24,18 +18,26 @@ class SignalementService {
                 });
             });
 
-            return signalements;
+            // Trier par date côté serveur
+            signalements.sort((a, b) => {
+                const dateA = new Date(a.date || 0);
+                const dateB = new Date(b.date || 0);
+                return dateB - dateA; // Descending order
+            });
+
+            // Appliquer la limite
+            return signalements.slice(0, limit);
 
         } catch (error) {
             console.error("Erreur Firestore, utilisation de données de test:", error.message);
             // Fallback avec données de test
             return [
-                { id: 'test-1', title: 'Activité suspecte sur un compte', type: 'Fraud', severity: 'High', status: 'Open', reportedBy: 'Jean Dupont', createdAt: Date.now() - 86400000, description: 'Tentatives de connexion non autorisées' },
-                { id: 'test-2', title: 'Contenu inapproprié', type: 'Content', severity: 'Medium', status: 'pending', reportedBy: 'Marie Martin', createdAt: Date.now() - 172800000, description: 'Publication de contenu interdit' },
-                { id: 'test-3', title: 'Problème de paiement', type: 'Payment', severity: 'High', status: 'resolved', reportedBy: 'Pierre Durand', createdAt: Date.now() - 259200000, description: 'Transaction échouée' },
-                { id: 'test-4', title: 'Service client insatisfaisant', type: 'Support', severity: 'Low', status: 'Open', reportedBy: 'Sophie Bernard', createdAt: Date.now() - 345600000, description: 'Agent non coopératif' },
-                { id: 'test-5', title: 'Bug technique', type: 'Bug', severity: 'Medium', status: 'in_review', reportedBy: 'Luc Petit', createdAt: Date.now() - 432000000, description: 'L\'application plante sur certaines pages' },
-                { id: 'test-6', title: 'Compromission de compte', type: 'Security', severity: 'Critical', status: 'Open', reportedBy: 'Emma Leroy', createdAt: Date.now() - 518400000, description: 'Tentative de prise de contrôle de compte' },
+                { id: 'test-1', title: 'Activité suspecte sur un compte', type: 'Fraud', severity: 'High', status: 'Open', reportedBy: 'Jean Dupont', date: new Date(Date.now() - 86400000).toISOString(), description: 'Tentatives de connexion non autorisées' },
+                { id: 'test-2', title: 'Contenu inapproprié', type: 'Content', severity: 'Medium', status: 'pending', reportedBy: 'Marie Martin', date: new Date(Date.now() - 172800000).toISOString(), description: 'Publication de contenu interdit' },
+                { id: 'test-3', title: 'Problème de paiement', type: 'Payment', severity: 'High', status: 'resolved', reportedBy: 'Pierre Durand', date: new Date(Date.now() - 259200000).toISOString(), description: 'Transaction échouée' },
+                { id: 'test-4', title: 'Service client insatisfaisant', type: 'Support', severity: 'Low', status: 'Open', reportedBy: 'Sophie Bernard', date: new Date(Date.now() - 345600000).toISOString(), description: 'Agent non coopératif' },
+                { id: 'test-5', title: 'Bug technique', type: 'Bug', severity: 'Medium', status: 'in_review', reportedBy: 'Luc Petit', date: new Date(Date.now() - 432000000).toISOString(), description: 'L\'application plante sur certaines pages' },
+                { id: 'test-6', title: 'Compromission de compte', type: 'Security', severity: 'Critical', status: 'Open', reportedBy: 'Emma Leroy', date: new Date(Date.now() - 518400000).toISOString(), description: 'Tentative de prise de contrôle de compte' },
             ];
         }
     }
@@ -55,12 +57,9 @@ class SignalementService {
 
     async createSignalement(data) {
         try {
-            const now = Date.now();
             const newDoc = await db.collection("signalements").add({
                 ...data,
-                status: data.status || "pending",
-                createdAt: now,
-                updatedAt: now
+                status: data.status || "pending"
             });
 
             const docSnap = await newDoc.get();
@@ -80,7 +79,6 @@ class SignalementService {
                 throw new Error("Signalement introuvable");
             }
 
-            data.updatedAt = Date.now();
             await docRef.update(data);
 
             const updatedSnap = await docRef.get();
@@ -104,6 +102,65 @@ class SignalementService {
             return { message: "Signalement supprimé avec succès" };
         } catch (error) {
             console.error("Erreur delete signalement :", error.message);
+            throw error;
+        }
+    }
+
+    async getSignalementsByUserId(userId, limit = 100) {
+        try {
+            // Charger tous les signalements et filtrer côté serveur
+            const snapshot = await db.collection("signalements").get();
+
+            const signalements = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                // Filtrer par user_id côté serveur
+                if (data.user_id === userId) {
+                    signalements.push({
+                        id: doc.id,
+                        ...data
+                    });
+                }
+            });
+
+            // Trier par date (descendant)
+            signalements.sort((a, b) => {
+                const dateA = new Date(a.date || 0);
+                const dateB = new Date(b.date || 0);
+                return dateB - dateA;
+            });
+
+            // Appliquer la limite
+            return signalements.slice(0, limit);
+        } catch (error) {
+            console.error("Erreur getSignalementsByUserId :", error.message);
+            throw error;
+        }
+    }
+
+    async cleanupTimestamps() {
+        try {
+            const snapshot = await db.collection("signalements").get();
+            const batch = db.batch();
+            let count = 0;
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                if (data.createdAt || data.updatedAt) {
+                    const updateData = { ...data };
+                    delete updateData.createdAt;
+                    delete updateData.updatedAt;
+                    batch.update(doc.ref, updateData);
+                    count++;
+                }
+            });
+
+            if (count > 0) {
+                await batch.commit();
+            }
+            return { cleaned: count };
+        } catch (error) {
+            console.error("Erreur cleanup timestamps :", error.message);
             throw error;
         }
     }
