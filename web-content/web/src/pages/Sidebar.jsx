@@ -6,8 +6,9 @@ const Sidebar = ({ onMenuClick, expanded: propExpanded = true, onToggle, userDat
 
   const menuItems = [
     { name: 'Dashboard', icon: '⊞', submenu: ['Activity', 'Traffic', 'Statistic'] },
-    { name: 'Customers', icon: '👥', link: 'customers' },
-    { name: 'Reports', icon: '📋', link: 'reports' },
+    { name: 'Users', icon: '👥', link: 'customers' },
+    { name: 'Reports Type', icon: '📋', link: 'reports' },
+    { name: 'Reports', icon: '📋', link: 'reportsall' },
     { name: 'Map', icon: '🗺️', link: 'map' },
     { name: 'Invoices', icon: '🧾' },
     { name: 'Wallet', icon: '💳' },

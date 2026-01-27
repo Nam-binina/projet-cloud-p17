@@ -1,20 +1,58 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './Reports.css';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 const Reports = () => {
-  const [reports, setReports] = useState([
-    { id: 1, title: 'Suspicious Activity on Account', type: 'Fraud', severity: 'High', status: 'Open', reportedBy: 'John Anderson', reportDate: '2024-01-18', description: 'Unauthorized login attempts detected' },
-    { id: 2, title: 'Inappropriate Content', type: 'Content', severity: 'Medium', status: 'In Review', reportedBy: 'Monica Sullivan', reportDate: '2024-01-17', description: 'User posted prohibited content' },
-    { id: 3, title: 'Payment Issue', type: 'Payment', severity: 'High', status: 'Resolved', reportedBy: 'Alfredo Santiago', reportDate: '2024-01-16', description: 'Failed transaction and incorrect billing' },
-    { id: 4, title: 'Poor Customer Service', type: 'Support', severity: 'Low', status: 'Open', reportedBy: 'Alfren Santagian', reportDate: '2024-01-15', description: 'Support agent was unhelpful' },
-    { id: 5, title: 'Technical Bug', type: 'Bug', severity: 'Medium', status: 'In Review', reportedBy: 'Christopher Davis', reportDate: '2024-01-14', description: 'Application crashes on certain pages' },
-    { id: 6, title: 'Account Compromise', type: 'Security', severity: 'Critical', status: 'Open', reportedBy: 'Christine Pierce', reportDate: '2024-01-13', description: 'Potential account takeover attempt' },
-  ]);
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
+
+  // Fetch signalements from API
+  useEffect(() => {
+    const fetchSignalements = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_URL}/api/signalements`);
+        const data = await response.json();
+        
+        if (data.success && data.signalements) {
+          // Transform API data to match table format
+          const formattedReports = data.signalements.map((sig, index) => ({
+            id: sig.id,
+            title: sig.title || 'Sans titre',
+            type: sig.type || 'Support',
+            severity: sig.severity || 'Medium',
+            status: sig.status === 'pending' ? 'Open' : 
+                   sig.status === 'in_review' ? 'In Review' : 
+                   sig.status === 'resolved' ? 'Resolved' : sig.status || 'Open',
+            reportedBy: sig.reportedBy || 'Anonymous',
+            reportDate: sig.createdAt ? new Date(sig.createdAt).toLocaleDateString('fr-FR') : 'N/A',
+            description: sig.description || ''
+          }));
+          setReports(formattedReports);
+        }
+      } catch (err) {
+        console.error('Erreur lors du chargement des signalements:', err);
+        setError('Impossible de charger les signalements');
+        // Fallback to test data if API fails
+        setReports([
+          { id: 1, title: 'Activité suspecte sur un compte', type: 'Fraud', severity: 'High', status: 'Open', reportedBy: 'John Anderson', reportDate: '18/01/2024', description: 'Tentatives de connexion non autorisées détectées' },
+          { id: 2, title: 'Contenu inapproprié', type: 'Content', severity: 'Medium', status: 'In Review', reportedBy: 'Monica Sullivan', reportDate: '17/01/2024', description: 'L\'utilisateur a publié du contenu interdit' },
+          { id: 3, title: 'Problème de paiement', type: 'Payment', severity: 'High', status: 'Resolved', reportedBy: 'Alfredo Santiago', reportDate: '16/01/2024', description: 'Transaction échouée et facturation incorrecte' },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSignalements();
+  }, []);
 
   const handleSelectAll = (e) => {
     if (e.target.checked) {
@@ -79,25 +117,21 @@ const Reports = () => {
         {/* Header Section */}
         <div className="reports-header">
           <div className="header-left">
-            <h1>Reports & Signalements</h1>
-            <p>Track and manage all reported issues</p>
+            <h1>Signalements</h1>
+            <p>Gérez et suivez tous les signalements (Firestore)</p>
           </div>
           <div className="header-right">
             <div className="search-box">
               <input
                 type="text"
-                placeholder="Search reports..."
+                placeholder="Rechercher un signalement..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="search-input"
               />
               <span className="search-icon">🔍</span>
             </div>
-            <button className="filter-btn">⚙️</button>
-            <div className="user-profile">
-              <div className="avatar">RP</div>
-              <span className="user-name">Report Manager</span>
-            </div>
+            <button className="filter-btn" onClick={() => window.location.reload()}>🔄</button>
           </div>
         </div>
 
@@ -143,7 +177,13 @@ const Reports = () => {
 
         {/* Table Section */}
         <div className="table-container">
-          <table className="reports-table">
+          {loading ? (
+            <div className="loading-state">
+              <div className="spinner"></div>
+              <p>Chargement des signalements depuis Firestore...</p>
+            </div>
+          ) : (
+            <table className="reports-table">
             <thead>
               <tr>
                 <th className="checkbox-col">
@@ -206,17 +246,18 @@ const Reports = () => {
               ))}
             </tbody>
           </table>
-
-          {/* Bulk Actions Bar */}
-          {selectedRows.length > 0 && (
-            <div className="bulk-actions">
-              <span className="selected-count">{selectedRows.length} selected</span>
-              <button className="action-button resolve-btn">Mark as Resolved</button>
-              <button className="action-button delete-btn">Delete</button>
-              <button className="action-button export-btn">Export</button>
-            </div>
           )}
         </div>
+
+        {/* Bulk Actions Bar */}
+        {selectedRows.length > 0 && (
+          <div className="bulk-actions">
+            <span className="selected-count">{selectedRows.length} selected</span>
+            <button className="action-button resolve-btn">Mark as Resolved</button>
+            <button className="action-button delete-btn">Delete</button>
+            <button className="action-button export-btn">Export</button>
+          </div>
+        )}
 
         {/* Pagination */}
         <div className="pagination">

@@ -203,20 +203,49 @@ class AuthService {
 
 
   async listUsers(maxResults = 1000) {
-    try {
-      const list = await admin.auth().listUsers(maxResults);
-      return list.users.map(user => ({
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        disabled: user.disabled,
-        providerData: user.providerData,
-        lastSignInTime: user.metadata.lastSignInTime,
-        creationTime: user.metadata.creationTime
-      }));
-    } catch (error) {
-      throw new Error("Impossible de lister les utilisateurs : " + error.message);
+    const firebaseAvailable = await this.checkFirebaseAvailability();
+
+    // Essayer d'abord Firebase Admin
+    if (firebaseAvailable) {
+      try {
+        const list = await admin.auth().listUsers(maxResults);
+        return list.users.map(user => ({
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName || null,
+          disabled: user.disabled,
+          provider: 'firebase',
+          lastSignInTime: user.metadata.lastSignInTime,
+          creationTime: user.metadata.creationTime
+        }));
+      } catch (error) {
+        console.log("Échec Firebase Admin, tentative avec PostgreSQL...");
+      }
     }
+
+    // Fallback PostgreSQL
+    const pgAvailable = await this.checkPostgreSQLAvailability();
+    if (!pgAvailable) {
+      throw new Error("Aucun service disponible pour lister les utilisateurs");
+    }
+
+    const result = await executeQuery(
+      `SELECT id, email, email_verified, firebase_uid, created_at, last_login, blocked_until
+       FROM users 
+       ORDER BY created_at DESC 
+       LIMIT $1`,
+      [maxResults]
+    );
+
+    return result.rows.map(user => ({
+      uid: user.firebase_uid || `pg_${user.id}`,
+      email: user.email,
+      displayName: null,
+      disabled: user.blocked_until ? new Date(user.blocked_until) > new Date() : false,
+      provider: user.firebase_uid ? 'firebase' : 'postgresql',
+      lastSignInTime: user.last_login,
+      creationTime: user.created_at
+    }));
   }
 
   async logoutUser() {

@@ -170,6 +170,14 @@
   width: 24px;
 }
 
+.marker-status {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
 /* Location Panel */
 .location-panel {
   position: fixed;
@@ -308,19 +316,41 @@
 
 /* Map Popup */
 .map-popup {
-  min-width: 120px;
+  min-width: 200px;
 }
 
 .map-popup h4 {
-  margin: 0 0 4px 0;
+  margin: 0 0 8px 0;
   font-size: 13px;
   color: var(--color-dark);
+  font-weight: 700;
+  border-bottom: 2px solid var(--color-primary);
+  padding-bottom: 6px;
 }
 
-.map-popup p {
-  margin: 0;
+.popup-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.popup-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   font-size: 11px;
+}
+
+.popup-label {
   color: var(--color-light);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+}
+
+.popup-value {
+  color: var(--color-dark);
+  font-weight: 500;
 }
 
 /* Responsive */

@@ -1,6 +1,5 @@
 require("dotenv").config();
 const firebase = require("firebase/app");
-const path = require('path');
 const { 
   getAuth, 
   createUserWithEmailAndPassword, 
@@ -11,26 +10,6 @@ const {
 
 } = require("firebase/auth") ;
 
-
-// Try to load service account, but don't fail if it doesn't exist
-let serviceAccount = null;
-const serviceAccountPath = path.resolve(__dirname, '../../', process.env.FIREBASE_SERVICE_ACCOUNT || 'firebase-service-account.json');
-try {
-  serviceAccount = require(serviceAccountPath);
-} catch (error) {
-  console.warn('Firebase service account not found, Firebase admin will be unavailable:', error.message);
-}
-
-// Initialize Firebase Admin only if service account exists
-if (serviceAccount) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
-  } catch (error) {
-    console.warn('Firebase Admin initialization failed:', error.message);
-  }
-}
 
 const firebaseConfig = {
   apiKey: process.env.FIREBASE_API_KEY,
@@ -62,6 +41,5 @@ module.exports = {
   signOut,
   sendEmailVerification,
   sendPasswordResetEmail,
-  admin,
   firebaseInitialized
 };

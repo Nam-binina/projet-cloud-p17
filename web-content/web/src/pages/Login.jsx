@@ -211,7 +211,7 @@ const Login = ({ onLogin }) => {
                   onChange={(e) => setUserType(e.target.value)}
                   disabled={loading}
                 />
-                <span>👁️ Visiteur</span>
+                <span>Visiteur</span>
               </label>
               <label className="radio-option">
                 <input
@@ -221,7 +221,7 @@ const Login = ({ onLogin }) => {
                   onChange={(e) => setUserType(e.target.value)}
                   disabled={loading}
                 />
-                <span>👤 Utilisateur</span>
+                <span>Utilisateur</span>
               </label>
               <label className="radio-option">
                 <input
@@ -231,7 +231,7 @@ const Login = ({ onLogin }) => {
                   onChange={(e) => setUserType(e.target.value)}
                   disabled={loading}
                 />
-                <span>👨‍💼 Manager</span>
+                <span>Manager</span>
               </label>
             </div>
           </div>
