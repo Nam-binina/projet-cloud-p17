@@ -5,6 +5,10 @@
         <ion-title>Signalements</ion-title>
 
         <ion-buttons slot="end">
+          <ion-button color="secondary" @click="toggleFilter" title="Basculer entre tous et mes signalements">
+            <ion-icon slot="start" :icon="funnelOutline"></ion-icon>
+            <span>{{ filterMineOnly ? 'Mes signalements' : 'Tous les signalements' }}</span>
+          </ion-button>
           <ion-button color="primary" @click="reloadPage">
             <ion-icon slot="icon-only" :icon="refreshOutline"></ion-icon>
           </ion-button>
@@ -82,6 +86,11 @@
           </ion-item>
 
           <ion-item>
+            <ion-label position="floating">Entreprise concernée</ion-label>
+            <ion-input v-model="form.entreprise" placeholder="Nom de l'entreprise"></ion-input>
+          </ion-item>
+
+          <ion-item>
             <ion-label position="floating">Surface (m²)</ion-label>
             <ion-input type="number" v-model.number="form.surface"></ion-input>
           </ion-item>
@@ -125,7 +134,7 @@ import { getFirestore, collection, addDoc, Timestamp, GeoPoint } from 'firebase/
 import { useCollection, useCurrentUser } from 'vuefire';
 import { getAuth, signOut } from 'firebase/auth';
 import { useFirebaseAuth } from 'vuefire';
-import { logOutOutline, eyeOutline, eyeOffOutline, refreshOutline } from 'ionicons/icons';
+import { logOutOutline, eyeOutline, eyeOffOutline, refreshOutline, funnelOutline } from 'ionicons/icons';
 import { useRouter } from 'vue-router';
 
 const auth = useFirebaseAuth();
@@ -138,26 +147,35 @@ const showRecap = ref(true); // Affiche le recap par défaut
 const db = getFirestore();
 const currentUser = useCurrentUser();
 
+const filterMineOnly = ref(false); // false = afficher tous, true = seulement mes signalements
+
 //  R�cup�ration r�active des signalements depuis Firebase
 const signalements = useCollection(collection(db, 'signalements'));
+
+const filteredSignalements = computed(() => {
+  if (filterMineOnly.value && currentUser.value) {
+    return (signalements.value || []).filter((s: any) => s.user_id === currentUser.value?.uid);
+  }
+  return signalements.value || [];
+});
 
 /* =========================
     R�cap
    ========================= */
-const totalSignalements = computed(() => signalements.value?.length || 0);
+const totalSignalements = computed(() => filteredSignalements.value.length);
 
 const totalSurface = computed(() =>
-  signalements.value?.reduce((s: number, x: any) => s + (x.surface || 0), 0) || 0
+  filteredSignalements.value.reduce((s: number, x: any) => s + (x.surface || 0), 0)
 );
 
 const totalBudget = computed(() =>
-  signalements.value?.reduce((s: number, x: any) => s + (x.budget || 0), 0) || 0
+  filteredSignalements.value.reduce((s: number, x: any) => s + (x.budget || 0), 0)
 );
 
 const avancement = computed(() => {
-  if (!signalements.value || signalements.value.length === 0) return 0;
-  const t = signalements.value.filter((s: any) => s.status === 'termine').length;
-  return Math.round((t / signalements.value.length) * 100);
+  if (filteredSignalements.value.length === 0) return 0;
+  const t = filteredSignalements.value.filter((s: any) => s.status === 'termine').length;
+  return Math.round((t / filteredSignalements.value.length) * 100);
 });
 
 async function handleLogout() {
@@ -170,6 +188,10 @@ async function handleLogout() {
       console.error("Erreur lors de la déconnexion :", error);
     }
   }
+}
+
+function toggleFilter() {
+  filterMineOnly.value = !filterMineOnly.value;
 }
 
 function reloadPage() {
@@ -188,6 +210,7 @@ const positionTemp = ref<{ lat: number; lng: number } | null>(null);
 const form = ref({
   statut: 'nouveau',
   description: '',
+  entreprise: '',
   surface: 0,
   budget: 0
 });
@@ -235,7 +258,8 @@ async function validerSignalement() {
     await addDoc(collection(db, 'signalements'), {
       budget: form.value.budget,
       date: Timestamp.now(),
-      descriptiotn: form.value.description,
+      description: form.value.description,
+      entreprise: form.value.entreprise,
       position: new GeoPoint(positionTemp.value.lat, positionTemp.value.lng),
       status: form.value.statut,
       surface: form.value.surface,
@@ -244,7 +268,7 @@ async function validerSignalement() {
 
     // reset
     showForm.value = false;
-    form.value = { statut: 'nouveau', description: '', surface: 0, budget: 0 };
+    form.value = { statut: 'nouveau', description: '', entreprise: '', surface: 0, budget: 0 };
     positionTemp.value = null;
 
     if (nouveauMarker) {
@@ -264,8 +288,8 @@ function afficherMarkers() {
   });
 
   // Ajouter les markers depuis Firebase avec couleur selon status
-  if (signalements.value) {
-    signalements.value.forEach((s: any) => {
+  if (filteredSignalements.value) {
+    filteredSignalements.value.forEach((s: any) => {
       if (s.position && s.position.latitude && s.position.longitude) {
         const icon = markerIcons[s.status as keyof typeof markerIcons] || markerIcons.nouveau;
         const marker = L.marker([s.position.latitude, s.position.longitude], { icon });
@@ -274,6 +298,7 @@ function afficherMarkers() {
         marker.bindPopup(`
           <b>Statut:</b> ${s.status}<br>
           <b>Surface:</b> ${s.surface} m²<br>
+          <b>Entreprise:</b> ${s.entreprise || 'N/A'}<br>
           <b>Description:</b> ${s.description}<br>
           <b>Budget:</b> ${s.budget} Ar<br>
           <b>Date:</b> ${s.date?.toDate?.().toLocaleDateString() || 'N/A'}
@@ -335,8 +360,8 @@ onMounted(() => {
   });
 });
 
-//  Mettre � jour les markers quand les donn�es Firebase changent
-watch(signalements, () => {
+//  Mettre à jour les markers quand les données Firebase changent ou le filtre change
+watch([signalements, filterMineOnly], () => {
   if (map) afficherMarkers();
 });
 </script>
