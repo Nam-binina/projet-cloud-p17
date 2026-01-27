@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import './Map.css';
+import SignalementForm from '../components/SignalementForm';
 
 const Map = () => {
   const [selectedLocation, setSelectedLocation] = useState(null);
+  const [clickedLocation, setClickedLocation] = useState(null);
+  const [showSignalementForm, setShowSignalementForm] = useState(false);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
 
@@ -194,23 +197,23 @@ const Map = () => {
             <h4>${location.name}</h4>
             <div class="popup-grid">
               <div class="popup-item">
-                <span class="popup-label">📅 Date:</span>
+                <span class="popup-label">Date:</span>
                 <span class="popup-value">${new Date(location.date).toLocaleDateString('fr-FR')}</span>
               </div>
               <div class="popup-item">
-                <span class="popup-label">📊 Statut:</span>
+                <span class="popup-label">Statut:</span>
                 <span class="popup-value" style="color: ${statusColors[location.status]}">${location.status}</span>
               </div>
               <div class="popup-item">
-                <span class="popup-label">📐 Surface:</span>
+                <span class="popup-label">Surface:</span>
                 <span class="popup-value">${location.surface.toLocaleString()} m²</span>
               </div>
               <div class="popup-item">
-                <span class="popup-label">💰 Budget:</span>
+                <span class="popup-label">Budget:</span>
                 <span class="popup-value">${location.budget.toLocaleString()} MGA</span>
               </div>
               <div class="popup-item">
-                <span class="popup-label">🏢 Entreprise:</span>
+                <span class="popup-label">Entreprise:</span>
                 <span class="popup-value">${location.company}</span>
               </div>
             </div>
@@ -242,6 +245,17 @@ const Map = () => {
     resetBtn.onclick = () => map.setView([20, 0], 2);
 
     map.getContainer().appendChild(controlContainer);
+
+    // Ajouter un événement clic sur la carte pour capturer les clics en dehors des marqueurs
+    map.on('click', (e) => {
+      // Fermer le panel de détails et afficher le panel d'action rapide
+      setSelectedLocation(null);
+      setClickedLocation({
+        lat: e.latlng.lat,
+        lng: e.latlng.lng,
+        name: `Localisation (${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)})`
+      });
+    });
   };
 
   return (
@@ -273,6 +287,45 @@ const Map = () => {
         <div className="map-wrapper">
           <div ref={mapRef} className="leaflet-map"></div>
           
+          {/* Quick Action Panel - appears when clicking on map (not on marker) */}
+          {clickedLocation && !selectedLocation && !showSignalementForm && (
+            <div className="quick-action-panel">
+              <div className="quick-action-content">
+                <p className="quick-action-title">Localisation sélectionnée</p>
+                <p className="quick-action-coords">
+                  {clickedLocation.lat.toFixed(4)}, {clickedLocation.lng.toFixed(4)}
+                </p>
+                <button 
+                  className="btn-signaler"
+                  onClick={() => setShowSignalementForm(true)}
+                >
+                  ➕ Ajouter un projet
+                </button>
+                <button 
+                  className="btn-close-quick"
+                  onClick={() => setClickedLocation(null)}
+                  title="Fermer"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Signalement Form Modal */}
+          {showSignalementForm && clickedLocation && (
+            <SignalementForm 
+              location={clickedLocation}
+              onClose={() => {
+                setShowSignalementForm(false);
+                setClickedLocation(null);
+              }}
+              onSubmit={() => {
+                // Optionnel: actualiser les données si nécessaire
+              }}
+            />
+          )}
+          
           {/* Location Details Panel */}
           {selectedLocation && (
             <div className="location-panel">
@@ -289,11 +342,11 @@ const Map = () => {
               <div className="panel-content">
                 <div className="location-info">
                   <div className="info-item">
-                    <label>📅 Date de report</label>
+                    <label>Date de report</label>
                     <p>{new Date(selectedLocation.date).toLocaleDateString('fr-FR')}</p>
                   </div>
                   <div className="info-item">
-                    <label>📊 Statut</label>
+                    <label>Statut</label>
                     <p style={{
                       display: 'inline-block',
                       padding: '4px 8px',
@@ -309,19 +362,19 @@ const Map = () => {
                     </p>
                   </div>
                   <div className="info-item">
-                    <label>📐 Surface</label>
+                    <label>Surface</label>
                     <p>{selectedLocation.surface.toLocaleString()} m²</p>
                   </div>
                   <div className="info-item">
-                    <label>💰 Budget</label>
+                    <label>Budget</label>
                     <p>{selectedLocation.budget.toLocaleString()} MGA</p>
                   </div>
                   <div className="info-item">
-                    <label>🏢 Entreprise concernée</label>
+                    <label>Entreprise concernée</label>
                     <p>{selectedLocation.company}</p>
                   </div>
                   <div className="info-item">
-                    <label>🌐 Coordonnées</label>
+                    <label>Coordonnées</label>
                     <p>{selectedLocation.lat.toFixed(4)}, {selectedLocation.lng.toFixed(4)}</p>
                   </div>
                 </div>
@@ -329,6 +382,19 @@ const Map = () => {
                 <div className="panel-actions">
                   <button className="btn-primary">Voir les détails</button>
                   <button className="btn-secondary">Itinéraire</button>
+                  <button 
+                    className="btn-report"
+                    onClick={() => {
+                      setClickedLocation({
+                        lat: selectedLocation.lat,
+                        lng: selectedLocation.lng,
+                        name: selectedLocation.name
+                      });
+                      setShowSignalementForm(true);
+                    }}
+                  >
+                    ✏️ Éditer
+                  </button>
                 </div>
               </div>
             </div>

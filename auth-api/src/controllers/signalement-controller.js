@@ -50,23 +50,31 @@ class SignalementController {
 
   async create(req, res) {
     try {
-      const { title, type, severity, description, reportedBy } = req.body;
+      const { budget, date, description, entreprise, position, status, surface, user_id } = req.body;
 
-      if (!title || !type) {
+      // Validation des champs requis
+      if (!budget || !description || !entreprise || !position || !status || !surface || !user_id) {
         return res.status(422).json({
-          error: "Titre et type requis",
-          title: !title ? "Titre requis" : undefined,
-          type: !type ? "Type requis" : undefined
+          error: "Champs requis manquants",
+          budget: !budget ? "Budget requis" : undefined,
+          description: !description ? "Description requise" : undefined,
+          entreprise: !entreprise ? "Entreprise requise" : undefined,
+          position: !position ? "Position requise" : undefined,
+          status: !status ? "Statut requis" : undefined,
+          surface: !surface ? "Surface requise" : undefined,
+          user_id: !user_id ? "User ID requis" : undefined
         });
       }
 
       const signalement = await signalementService.createSignalement({
-        title,
-        type,
-        severity: severity || 'Medium',
-        description: description || '',
-        reportedBy: reportedBy || 'Anonymous',
-        status: 'Open'
+        budget,
+        date: date || new Date().toISOString(),
+        description,
+        entreprise,
+        position,
+        status,
+        surface,
+        user_id
       });
 
       return res.status(201).json({
