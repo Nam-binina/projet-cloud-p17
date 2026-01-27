@@ -5,14 +5,14 @@ const Sidebar = ({ onMenuClick, expanded: propExpanded = true, onToggle, userDat
   const [activeMenu, setActiveMenu] = useState('Dashboard');
 
   const menuItems = [
-    { name: 'Dashboard', icon: '⊞', submenu: ['Activity', 'Traffic', 'Statistic'] },
-    { name: 'Users', icon: '👥', link: 'customers' },
-    { name: 'Reports Type', icon: '📋', link: 'reports' },
-    { name: 'Reports', icon: '📋', link: 'reportsall' },
-    { name: 'Map', icon: '🗺️', link: 'map' },
-    { name: 'Invoices', icon: '🧾' },
-    { name: 'Wallet', icon: '💳' },
-    { name: 'Notification', icon: '🔔' },
+    { name: 'Dashboard', icon: '', submenu: ['Activity', 'Traffic', 'Statistic'] },
+    { name: 'Users', icon: '', link: 'customers' },
+    { name: 'Reports Type', icon: '', link: 'reports' },
+    { name: 'Reports', icon: '', link: 'reportsall' },
+    { name: 'Map', icon: '', link: 'map' },
+    { name: 'Invoices', icon: '' },
+    { name: 'Wallet', icon: '' },
+    { name: 'Notification', icon: '' },
   ];
 
   const handleMenuClick = (item) => {
@@ -23,9 +23,9 @@ const Sidebar = ({ onMenuClick, expanded: propExpanded = true, onToggle, userDat
   };
 
   const messages = [
-    { name: 'Erik Gunsel', avatar: '👤' },
-    { name: 'Emily Smith', avatar: '👤' },
-    { name: 'Arthur Adeik', avatar: '👤' },
+    // { name: 'Erik Gunsel', avatar: '👤' },
+    // { name: 'Emily Smith', avatar: '👤' },
+    // { name: 'Arthur Adeik', avatar: '👤' },
   ];
 
   return (
@@ -88,11 +88,11 @@ const Sidebar = ({ onMenuClick, expanded: propExpanded = true, onToggle, userDat
 
       {/* Footer CTA */}
       <div className="sidebar-footer">
-        <p className="footer-text">Let's start!</p>
-        {propExpanded && <p className="footer-subtext">Creating or adding new tasks couldn't be easier</p>}
-        <button className="add-task-btn">
+        {/* <p className="footer-text">Let's start!</p> */}
+        {/* {propExpanded && <p className="footer-subtext">Creating or adding new tasks couldn't be easier</p>} */}
+        {/* <button className="add-task-btn">
           <span>+</span> {propExpanded && 'Add New Task'}
-        </button>
+        </button> */}
         
         {/* Logout Button */}
         <button 

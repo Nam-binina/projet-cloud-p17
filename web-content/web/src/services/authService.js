@@ -141,6 +141,82 @@ export const validateToken = async (token) => {
 };
 
 /**
+ * Get all users
+ */
+export const getAllUsers = async () => {
+  try {
+    const response = await fetch(`${API_URL}/api/users`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erreur lors de la récupération des utilisateurs: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return { success: true, data: data.users || [] };
+  } catch (error) {
+    console.error('Erreur lors de la récupération des utilisateurs:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Block a user by email
+ */
+export const blockUser = async (email, durationMinutes = 1440) => {
+  try {
+    console.log(`Blocage de l'utilisateur ${email} pour ${durationMinutes} minutes...`);
+    const response = await fetch(`${API_URL}/api/firebase/block-user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, durationMinutes })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erreur lors du blocage: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return { success: true, data };
+  } catch (error) {
+    console.error('Erreur lors du blocage de l\'utilisateur:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Unblock a user by email
+ */
+export const unblockUser = async (email) => {
+  try {
+    console.log(`Déblocage de l'utilisateur ${email}...`);
+    const response = await fetch(`${API_URL}/api/firebase/unblock-user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erreur lors du déblocage: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return { success: true, data };
+  } catch (error) {
+    console.error('Erreur lors du déblocage de l\'utilisateur:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
  * Listen to online/offline events
  */
 export const setupConnectivityListener = (onOnline, onOffline) => {

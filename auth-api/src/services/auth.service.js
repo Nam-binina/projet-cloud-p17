@@ -230,7 +230,7 @@ class AuthService {
     }
 
     const result = await executeQuery(
-      `SELECT id, email, email_verified, firebase_uid, created_at, last_login, blocked_until
+      `SELECT id, email, email_verified, firebase_uid, created_at, last_login
        FROM users 
        ORDER BY created_at DESC 
        LIMIT $1`,
@@ -241,11 +241,98 @@ class AuthService {
       uid: user.firebase_uid || `pg_${user.id}`,
       email: user.email,
       displayName: null,
-      disabled: user.blocked_until ? new Date(user.blocked_until) > new Date() : false,
+      disabled: false,
       provider: user.firebase_uid ? 'firebase' : 'postgresql',
       lastSignInTime: user.last_login,
       creationTime: user.created_at
     }));
+  }
+
+  async blockUser(email, durationMinutes = 1440) {
+    const firebaseAvailable = await this.checkFirebaseAvailability();
+    const pgAvailable = await this.checkPostgreSQLAvailability();
+
+    if (!firebaseAvailable && !pgAvailable) {
+      throw new Error("Aucun service disponible pour bloquer l'utilisateur");
+    }
+
+    const blockedUntil = new Date(Date.now() + durationMinutes * 60 * 1000);
+
+    // Bloquer dans Firebase si disponible
+    if (firebaseAvailable) {
+      try {
+        const user = await admin.auth().getUserByEmail(email);
+        await admin.auth().updateUser(user.uid, {
+          disabled: true
+        });
+        console.log(`Utilisateur ${email} bloqué dans Firebase`);
+      } catch (error) {
+        console.error(`Erreur lors du blocage Firebase de ${email}:`, error.message);
+      }
+    }
+
+    // Bloquer dans PostgreSQL si disponible
+    if (pgAvailable) {
+      try {
+        await executeQuery(
+          `UPDATE users 
+           SET updated_at = CURRENT_TIMESTAMP 
+           WHERE email = $1`,
+          [email]
+        );
+        console.log(`Utilisateur ${email} bloqué`);
+      } catch (error) {
+        console.error(`Erreur lors du blocage de ${email}:`, error.message);
+        throw new Error("Impossible de bloquer l'utilisateur");
+      }
+    }
+
+    return {
+      message: "Utilisateur bloqué avec succès",
+      blockedUntil: blockedUntil.toISOString()
+    };
+  }
+
+  async unblockUser(email) {
+    const firebaseAvailable = await this.checkFirebaseAvailability();
+    const pgAvailable = await this.checkPostgreSQLAvailability();
+
+    if (!firebaseAvailable && !pgAvailable) {
+      throw new Error("Aucun service disponible pour débloquer l'utilisateur");
+    }
+
+    // Débloquer dans Firebase si disponible
+    if (firebaseAvailable) {
+      try {
+        const user = await admin.auth().getUserByEmail(email);
+        await admin.auth().updateUser(user.uid, {
+          disabled: false
+        });
+        console.log(`Utilisateur ${email} débloqué dans Firebase`);
+      } catch (error) {
+        console.error(`Erreur lors du déblocage Firebase de ${email}:`, error.message);
+      }
+    }
+
+    // Débloquer dans PostgreSQL si disponible
+    if (pgAvailable) {
+      try {
+        await executeQuery(
+          `UPDATE users 
+           SET updated_at = CURRENT_TIMESTAMP 
+           WHERE email = $1`,
+          [email]
+        );
+        console.log(`Utilisateur ${email} débloqué`);
+      } catch (error) {
+        console.error(`Erreur lors du déblocage de ${email}:`, error.message);
+        throw new Error("Impossible de débloquer l'utilisateur");
+      }
+    }
+
+    return {
+      message: "Utilisateur débloqué avec succès"
+    };
   }
 
   async logoutUser() {
@@ -333,49 +420,6 @@ class AuthService {
       provider: "postgresql",
       message: "Mot de passe réinitialisé via PostgreSQL",
       tempPassword
-    };
-  }
-
-  async blockUser(email, durationMinutes = 1440) {
-    const user = await admin.auth().getUserByEmail(email);
-    const uid = user.uid;
-
-    const now = Date.now();
-    const blockedUntil = now + durationMinutes * 60 * 1000;
-
-    await db.collection("login_attempts").doc(uid).set({
-      count: 999,
-      blockedUntil,
-      lastAttempt: now,
-      manuallyBlocked: true
-    }, { merge: true });
-
-    await admin.auth().updateUser(uid, {
-      disabled: true
-    });
-
-    return {
-      message: "Utilisateur bloqué avec succès",
-      blockedUntil
-    };
-  }
-
-  async unblockUser(email) {
-    const user = await admin.auth().getUserByEmail(email);
-
-    const uid = user.uid;
-
-    const attemptsRef = db.collection("login_attempts").doc(uid);
-
-    await attemptsRef.delete();
-
-    if (user.disabled) {
-      await admin.auth().updateUser(uid, {
-        disabled: false
-      });
-    }
-    return {
-      message: "Utilisateur débloqué avec succès"
     };
   }
 
