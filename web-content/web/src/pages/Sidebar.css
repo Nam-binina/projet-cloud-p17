@@ -293,6 +293,35 @@
   transform: translateY(0);
 }
 
+/* Logout Button */
+.logout-btn {
+  width: 100%;
+  background: #E8544D;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.logout-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(230, 84, 77, 0.3);
+  background: #D63E36;
+}
+
+.logout-btn:active {
+  transform: translateY(0);
+}
+
 /* Collapsed state */
 .sidebar.collapsed .profile-info,
 .sidebar.collapsed .menu-label,

@@ -1,19 +1,49 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './CustomersTable.css';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 const CustomersTable = () => {
-  const [customers, setCustomers] = useState([
-    { id: 1, name: 'John Anderson', email: 'john@example.com', status: 'Active', amount: '48.00', phone: '+1-234-567-8900', company: 'Tech Corp', joinDate: '2023-01-15' },
-    { id: 2, name: 'Monica Sullivan', email: 'monica@example.com', status: 'Active', amount: '35.00', phone: '+1-234-567-8901', company: 'Design Inc', joinDate: '2023-02-20' },
-    { id: 3, name: 'Alfredo Santiago', email: 'alfredo@example.com', status: 'Active', amount: '80.00', phone: '+1-234-567-8902', company: 'Creative Ltd', joinDate: '2023-03-10' },
-    { id: 4, name: 'Alfren Santagian', email: 'alfren@example.com', status: 'Inactive', amount: 'N/A', phone: '+1-234-567-8903', company: 'Startup Co', joinDate: '2023-04-05' },
-    { id: 5, name: 'Christopher Davis', email: 'christopher@example.com', status: 'Active', amount: '45.00', phone: '+1-234-567-8904', company: 'Enterprise Pro', joinDate: '2023-05-12' },
-    { id: 6, name: 'Christine Pierce', email: 'christine@example.com', status: 'Active', amount: '55.00', phone: '+1-234-567-8905', company: 'Global Solutions', joinDate: '2023-06-18' },
-  ]);
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+
+  // Fetch users from API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_URL}/api/users`);
+        const data = await response.json();
+        
+        if (data.success && data.users) {
+          // Transform API data to match table format
+          const formattedUsers = data.users.map((user, index) => ({
+            id: index + 1,
+            uid: user.uid,
+            name: user.displayName || user.email.split('@')[0],
+            email: user.email,
+            status: user.disabled ? 'Bloqué' : 'Actif',
+            provider: user.provider,
+            joinDate: user.creationTime ? new Date(user.creationTime).toLocaleDateString('fr-FR') : 'N/A',
+            lastLogin: user.lastSignInTime ? new Date(user.lastSignInTime).toLocaleDateString('fr-FR') : 'Jamais'
+          }));
+          setCustomers(formattedUsers);
+        }
+      } catch (err) {
+        console.error('Erreur lors du chargement des utilisateurs:', err);
+        setError('Impossible de charger les utilisateurs');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
 
   const handleSelectAll = (e) => {
     if (e.target.checked) {
@@ -46,50 +76,57 @@ const CustomersTable = () => {
         {/* Header Section */}
         <div className="customers-header">
           <div className="header-left">
-            <h1>Customers</h1>
-            <p>Manage your customers and their information</p>
+            <h1>Utilisateurs</h1>
+            <p>Gérez les utilisateurs et leurs informations</p>
           </div>
           <div className="header-right">
             <div className="search-box">
               <input
                 type="text"
-                placeholder="Search customers..."
+                placeholder="Rechercher un utilisateur..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="search-input"
               />
               <span className="search-icon">🔍</span>
             </div>
-            <button className="filter-btn">⚙️</button>
-            <div className="user-profile">
-              <div className="avatar">ID</div>
-              <span className="user-name">Isabella Donovan</span>
-            </div>
+            <button className="filter-btn" onClick={() => window.location.reload()}>🔄</button>
           </div>
         </div>
 
         {/* Stats Section */}
         <div className="stats-section">
           <div className="stat-card">
-            <div className="stat-label">Total Customers</div>
-            <div className="stat-value">1,234</div>
-            <div className="stat-change positive">↑ 12% from last month</div>
+            <div className="stat-label">Total Utilisateurs</div>
+            <div className="stat-value">{customers.length}</div>
+            <div className="stat-change positive">Firebase + PostgreSQL</div>
           </div>
           <div className="stat-card">
-            <div className="stat-label">Active Customers</div>
-            <div className="stat-value">987</div>
-            <div className="stat-change positive">↑ 8% from last month</div>
+            <div className="stat-label">Utilisateurs Actifs</div>
+            <div className="stat-value">{customers.filter(c => c.status === 'Actif').length}</div>
+            <div className="stat-change positive">En ligne</div>
           </div>
           <div className="stat-card">
-            <div className="stat-label">Revenue</div>
-            <div className="stat-value">$42,500</div>
-            <div className="stat-change positive">↑ 15% from last month</div>
+            <div className="stat-label">Utilisateurs Bloqués</div>
+            <div className="stat-value">{customers.filter(c => c.status === 'Bloqué').length}</div>
+            <div className="stat-change">{customers.filter(c => c.status === 'Bloqué').length > 0 ? 'À vérifier' : 'Aucun'}</div>
           </div>
         </div>
 
         {/* Table Section */}
         <div className="table-container">
-          <table className="customers-table">
+          {loading ? (
+            <div className="loading-state">
+              <div className="spinner"></div>
+              <p>Chargement des utilisateurs...</p>
+            </div>
+          ) : error ? (
+            <div className="error-state">
+              <p>❌ {error}</p>
+              <button onClick={() => window.location.reload()}>Réessayer</button>
+            </div>
+          ) : (
+            <table className="customers-table">
             <thead>
               <tr>
                 <th className="checkbox-col">
@@ -100,10 +137,12 @@ const CustomersTable = () => {
                     className="select-all-checkbox"
                   />
                 </th>
-                <th>Name</th>
+                <th>Nom</th>
                 <th>Email</th>
-                <th>Status</th>
-                <th>Amount</th>
+                <th>Statut</th>
+                <th>Provider</th>
+                <th>Inscription</th>
+                <th>Dernière connexion</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -123,16 +162,22 @@ const CustomersTable = () => {
                     />
                   </td>
                   <td className="name-cell">
-                    <div className="customer-avatar">{customer.name.charAt(0)}</div>
+                    <div className="customer-avatar">{customer.name.charAt(0).toUpperCase()}</div>
                     <span>{customer.name}</span>
                   </td>
                   <td>{customer.email}</td>
                   <td>
-                    <span className={`status-badge ${customer.status.toLowerCase()}`}>
+                    <span className={`status-badge ${customer.status === 'Actif' ? 'active' : 'inactive'}`}>
                       {customer.status}
                     </span>
                   </td>
-                  <td className="amount-cell">${customer.amount}</td>
+                  <td>
+                    <span className={`provider-badge ${customer.provider}`}>
+                      {customer.provider === 'firebase' ? '🔥 Firebase' : '🐘 PostgreSQL'}
+                    </span>
+                  </td>
+                  <td>{customer.joinDate}</td>
+                  <td>{customer.lastLogin}</td>
                   <td className="action-cell" onClick={(e) => e.stopPropagation()}>
                     <button className="action-btn">⋮</button>
                   </td>
@@ -140,16 +185,17 @@ const CustomersTable = () => {
               ))}
             </tbody>
           </table>
+          )}
+        </div>
 
-          {/* Bulk Actions Bar */}
-          {selectedRows.length > 0 && (
-            <div className="bulk-actions">
+        {/* Bulk Actions Bar */}
+        {selectedRows.length > 0 && (
+          <div className="bulk-actions">
               <span className="selected-count">{selectedRows.length} selected</span>
               <button className="action-button delete-btn">Delete</button>
               <button className="action-button export-btn">Export</button>
             </div>
           )}
-        </div>
 
         {/* Pagination */}
         <div className="pagination">
@@ -169,7 +215,7 @@ const CustomersTable = () => {
       {selectedCustomer && (
         <div className="customer-details-panel">
           <div className="panel-header">
-            <h2>Customer Details</h2>
+            <h2>Détails Utilisateur</h2>
             <button 
               className="close-btn"
               onClick={() => setSelectedCustomer(null)}
@@ -181,9 +227,9 @@ const CustomersTable = () => {
           <div className="panel-content">
             {/* Avatar and Name */}
             <div className="customer-profile">
-              <div className="large-avatar">{selectedCustomer.name.charAt(0)}</div>
+              <div className="large-avatar">{selectedCustomer.name.charAt(0).toUpperCase()}</div>
               <h3>{selectedCustomer.name}</h3>
-              <span className={`status-badge ${selectedCustomer.status.toLowerCase()}`}>
+              <span className={`status-badge ${selectedCustomer.status === 'Actif' ? 'active' : 'inactive'}`}>
                 {selectedCustomer.status}
               </span>
             </div>
@@ -191,31 +237,35 @@ const CustomersTable = () => {
             {/* Details */}
             <div className="details-group">
               <div className="detail-item">
-                <label>Email</label>
+                <label>📧 Email</label>
                 <p>{selectedCustomer.email}</p>
               </div>
               <div className="detail-item">
-                <label>Phone</label>
-                <p>{selectedCustomer.phone}</p>
+                <label>🆔 UID</label>
+                <p className="uid-text">{selectedCustomer.uid}</p>
               </div>
               <div className="detail-item">
-                <label>Company</label>
-                <p>{selectedCustomer.company}</p>
+                <label>🔐 Provider</label>
+                <p>
+                  <span className={`provider-badge ${selectedCustomer.provider}`}>
+                    {selectedCustomer.provider === 'firebase' ? '🔥 Firebase' : '🐘 PostgreSQL'}
+                  </span>
+                </p>
               </div>
               <div className="detail-item">
-                <label>Join Date</label>
+                <label>📅 Date d'inscription</label>
                 <p>{selectedCustomer.joinDate}</p>
               </div>
               <div className="detail-item">
-                <label>Total Amount</label>
-                <p className="amount">${selectedCustomer.amount}</p>
+                <label>🕐 Dernière connexion</label>
+                <p>{selectedCustomer.lastLogin}</p>
               </div>
             </div>
 
             {/* Action Buttons */}
             <div className="panel-actions">
-              <button className="btn-primary">Edit</button>
-              <button className="btn-secondary">Delete</button>
+              <button className="btn-primary">Debloquer</button>
+              <button className="btn-secondary btn-danger">Bloquer</button>
             </div>
           </div>
         </div>

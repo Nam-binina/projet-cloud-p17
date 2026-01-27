@@ -26,12 +26,17 @@ services:
     build: ./auth-api
     ports:
       - "3000:3000"
+    env_file: ./auth-api/.env
     environment:
       - PG_HOST=postgres
       - PG_PORT=5432
       - PG_DATABASE=auth_db
       - PG_USER=postgres
       - PG_PASSWORD=admin
+      - NODE_ENV=development
+      - SERVER_PORT=3000
+      - SERVER_HOST=0.0.0.0
+      - FIREBASE_SERVICE_ACCOUNT=firebase-service-account.json
     depends_on:
       postgres:
         condition: service_healthy
@@ -41,12 +46,17 @@ services:
   tile-server:
     image: overv/openstreetmap-tile-server:1.4.0
     container_name: s5-tile-server
+    command: run
+    shm_size: 512m
     ports:
       - "8081:80"
     volumes:
-      - ./cartes/data:/var/lib/postgresql/14/main
+      - ./cartes/data/antananarivo.osm.pbf:/data.osm.pbf
+      - osm-data:/var/lib/postgresql/12/main
+      - osm-tiles:/var/lib/mod_tile
     environment:
       - THREADS=4
+      - ALLOW_CORS=enabled
     networks:
       - app-network
 
@@ -84,6 +94,10 @@ services:
 
 volumes:
   postgres-data:
+    driver: local
+  osm-data:
+    driver: local
+  osm-tiles:
     driver: local
 
 networks:
