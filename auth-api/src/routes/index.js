@@ -16,6 +16,7 @@ router.get('/api/auth/status', authController.getStatus);
 router.post('/api/firebase/block-user',authController.blockUser);
 router.post('/api/firebase/unblock-user',authController.unblockUser);
 router.get('/api/users',authController.getAllUsers);
+router.post('/api/sync', authController.syncDatabases);
 
 router.post('/api/firebase/register', firebaseAuthController.registerUser);
 router.post('/api/firebase/login', firebaseAuthController.loginUser);

@@ -2,14 +2,19 @@ import { useState, useEffect, useRef } from 'react';
 import './Map.css';
 import SignalementForm from '../components/SignalementForm';
 
-const Map = () => {
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+const Map = ({ userData }) => {
   const [selectedLocation, setSelectedLocation] = useState(null);
+  const [selectedSignalement, setSelectedSignalement] = useState(null);
   const [clickedLocation, setClickedLocation] = useState(null);
   const [showSignalementForm, setShowSignalementForm] = useState(false);
   const [signalements, setSignalements] = useState([]);
   const [mySignalements, setMySignalements] = useState([]);
   const [showMySignalements, setShowMySignalements] = useState(false);
   const [loadingSignalements, setLoadingSignalements] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [statusMessage, setStatusMessage] = useState(null);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
@@ -259,6 +264,7 @@ const Map = () => {
     map.on('click', (e) => {
       // Fermer le panel de détails et afficher le panel d'action rapide
       setSelectedLocation(null);
+      setSelectedSignalement(null);
       setClickedLocation({
         lat: e.latlng.lat,
         lng: e.latlng.lng,
@@ -271,7 +277,7 @@ const Map = () => {
   const loadAllSignalements = async () => {
     try {
       setLoadingSignalements(true);
-      const response = await fetch('http://localhost:3000/api/signalements');
+      const response = await fetch(`${API_URL}/api/signalements`);
       const data = await response.json();
 
       if (data.success && data.signalements) {
@@ -297,7 +303,7 @@ const Map = () => {
         return;
       }
 
-      const response = await fetch(`http://localhost:3000/api/signalements/user/${userId}`);
+      const response = await fetch(`${API_URL}/api/signalements/user/${userId}`);
       const data = await response.json();
 
       if (data.success && data.signalements) {
@@ -465,6 +471,16 @@ const Map = () => {
             </div>
           </div>
         `);
+
+        // Ouvrir le panneau latéral lors du clic
+        marker.on('click', () => {
+          setSelectedSignalement({
+            ...signalement,
+            lat: lat,
+            lng: lng
+          });
+          setClickedLocation(null);
+        });
       } catch (error) {
         console.error('Error adding signalement marker:', error);
       }
@@ -475,6 +491,43 @@ const Map = () => {
     setShowMySignalements(false);
     setMySignalements([]);
     displaySignalements(signalements);
+  };
+
+  // Mettre à jour le statut d'un signalement
+  const updateSignalementStatus = async (signalementId, newStatus) => {
+    try {
+      setUpdatingStatus(true);
+      setStatusMessage(null);
+
+      const response = await fetch(`${API_URL}/api/signalements/${signalementId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setStatusMessage({ type: 'success', text: '✅ Statut mis à jour avec succès' });
+        
+        // Mettre à jour le signalement sélectionné
+        setSelectedSignalement(prev => ({ ...prev, status: newStatus }));
+        
+        // Recharger les signalements
+        await loadAllSignalements();
+        
+        setTimeout(() => setStatusMessage(null), 3000);
+      } else {
+        setStatusMessage({ type: 'error', text: `❌ Erreur: ${data.error}` });
+      }
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour:', error);
+      setStatusMessage({ type: 'error', text: `❌ Erreur: ${error.message}` });
+    } finally {
+      setUpdatingStatus(false);
+    }
   };
 
   return (
@@ -516,7 +569,7 @@ const Map = () => {
           <div ref={mapRef} className="leaflet-map"></div>
           
           {/* Quick Action Panel - appears when clicking on map (not on marker) */}
-          {clickedLocation && !selectedLocation && !showSignalementForm && (
+          {clickedLocation && !selectedLocation && !selectedSignalement && !showSignalementForm && (
             <div className="quick-action-panel">
               <div className="quick-action-content">
                 <p className="quick-action-title">Localisation sélectionnée</p>
@@ -536,6 +589,113 @@ const Map = () => {
                 >
                   ✕
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Signalement Details Panel - appears when clicking on a signalement marker */}
+          {selectedSignalement && (
+            <div className="signalement-panel">
+              <div className="panel-header">
+                <h3>📍 Détails du signalement</h3>
+                <button 
+                  className="close-btn"
+                  onClick={() => {
+                    setSelectedSignalement(null);
+                    setStatusMessage(null);
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="panel-content">
+                {/* Status Message */}
+                {statusMessage && (
+                  <div className={`status-message ${statusMessage.type}`}>
+                    {statusMessage.text}
+                  </div>
+                )}
+
+                <div className="signalement-info">
+                  <div className="info-item">
+                    <label>📝 Description</label>
+                    <p>{selectedSignalement.description}</p>
+                  </div>
+                  <div className="info-item">
+                    <label>📅 Date</label>
+                    <p>{new Date(selectedSignalement.date).toLocaleDateString('fr-FR')}</p>
+                  </div>
+                  <div className="info-item">
+                    <label>📊 Statut actuel</label>
+                    <p className={`status-badge status-${selectedSignalement.status}`}>
+                      {selectedSignalement.status === 'en_attente' && '⏳ En attente'}
+                      {selectedSignalement.status === 'planifie' && '📋 Planifié'}
+                      {selectedSignalement.status === 'en_cours' && '🔄 En cours'}
+                      {selectedSignalement.status === 'termine' && '✅ Terminé'}
+                    </p>
+                  </div>
+                  <div className="info-item">
+                    <label>📐 Surface</label>
+                    <p>{selectedSignalement.surface?.toLocaleString() || 'N/A'} m²</p>
+                  </div>
+                  <div className="info-item">
+                    <label>💰 Budget</label>
+                    <p>{selectedSignalement.budget?.toLocaleString() || 'N/A'} MGA</p>
+                  </div>
+                  <div className="info-item">
+                    <label>🏢 Entreprise</label>
+                    <p>{selectedSignalement.entreprise || 'N/A'}</p>
+                  </div>
+                  <div className="info-item">
+                    <label>📍 Coordonnées</label>
+                    <p>{selectedSignalement.lat?.toFixed(4)}, {selectedSignalement.lng?.toFixed(4)}</p>
+                  </div>
+                </div>
+
+                {/* Modifier le statut - visible pour manager et user */}
+                {userData?.userType !== 'visitor' && (
+                  <div className="status-modifier">
+                    <label>🔄 Modifier le statut</label>
+                    <div className="status-buttons">
+                      <button
+                        className={`status-btn en_attente ${selectedSignalement.status === 'en_attente' ? 'active' : ''}`}
+                        onClick={() => updateSignalementStatus(selectedSignalement.id, 'en_attente')}
+                        disabled={updatingStatus || selectedSignalement.status === 'en_attente'}
+                      >
+                        ⏳ En attente
+                      </button>
+                      <button
+                        className={`status-btn planifie ${selectedSignalement.status === 'planifie' ? 'active' : ''}`}
+                        onClick={() => updateSignalementStatus(selectedSignalement.id, 'planifie')}
+                        disabled={updatingStatus || selectedSignalement.status === 'planifie'}
+                      >
+                        📋 Planifié
+                      </button>
+                      <button
+                        className={`status-btn en_cours ${selectedSignalement.status === 'en_cours' ? 'active' : ''}`}
+                        onClick={() => updateSignalementStatus(selectedSignalement.id, 'en_cours')}
+                        disabled={updatingStatus || selectedSignalement.status === 'en_cours'}
+                      >
+                        🔄 En cours
+                      </button>
+                      <button
+                        className={`status-btn termine ${selectedSignalement.status === 'termine' ? 'active' : ''}`}
+                        onClick={() => updateSignalementStatus(selectedSignalement.id, 'termine')}
+                        disabled={updatingStatus || selectedSignalement.status === 'termine'}
+                      >
+                        ✅ Terminé
+                      </button>
+                    </div>
+                    {updatingStatus && <p className="updating-text">⏳ Mise à jour en cours...</p>}
+                  </div>
+                )}
+
+                {userData?.userType === 'visitor' && (
+                  <div className="visitor-notice">
+                    🔒 Connectez-vous pour modifier le statut des signalements
+                  </div>
+                )}
               </div>
             </div>
           )}

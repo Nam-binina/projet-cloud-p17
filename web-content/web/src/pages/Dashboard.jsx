@@ -1,17 +1,49 @@
 import { useState } from 'react';
 import './Dashboard.css';
 
+// Determine API URL based on environment
+const getApiUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return 'http://localhost:3000';
+  }
+  return `http://${window.location.hostname}:3000`;
+};
+
+const API_URL = getApiUrl();
+
 const Dashboard = () => {
   const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSync, setLastSync] = useState('2 hours ago');
+  const [lastSync, setLastSync] = useState('Never');
+  const [syncResult, setSyncResult] = useState(null);
+  const [syncError, setSyncError] = useState(null);
 
   const handleSync = async () => {
     setIsSyncing(true);
-    // Simulation de synchronisation
-    setTimeout(() => {
-      setLastSync('Just now');
+    setSyncError(null);
+    try {
+      const response = await fetch(`${API_URL}/api/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Sync failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setSyncResult(data.data);
+      setLastSync(new Date().toLocaleString());
+    } catch (error) {
+      console.error('Sync error:', error);
+      setSyncError(error.message);
+    } finally {
       setIsSyncing(false);
-    }, 2000);
+    }
   };
 
   return (
@@ -36,6 +68,20 @@ const Dashboard = () => {
       <div className="sync-info">
         Last synchronized: <strong>{lastSync}</strong>
       </div>
+
+      {/* Sync Result/Error */}
+      {syncError && (
+        <div className="sync-alert error">
+          ❌ Sync Error: {syncError}
+        </div>
+      )}
+      {syncResult && (
+        <div className="sync-alert success">
+          ✅ Sync completed! 
+          <span> Firebase → PostgreSQL: {syncResult.firebase_to_pg?.created || 0} created, {syncResult.firebase_to_pg?.updated || 0} updated</span>
+          <span> | PostgreSQL → Firebase: {syncResult.pg_to_firebase?.created || 0} created, {syncResult.pg_to_firebase?.updated || 0} updated</span>
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="kpis-section">

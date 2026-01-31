@@ -185,7 +185,25 @@ class AuthController {
       });
     }
   }
-  er
+  async syncDatabases(req, res) {
+    try {
+      const { syncBidirectional } = require('../utils/synchronisationUtils');
+      const result = await syncBidirectional();
+
+      return res.status(200).json({
+        success: true,
+        message: 'Synchronisation terminée',
+        data: result
+      });
+
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation:', error);
+      return res.status(500).json({
+        error: error.message || 'Une erreur est survenue lors de la synchronisation'
+      });
+    }
+  }
+
   async getStatus(req, res) {
     try {
       const status = await authService.getServicesStatus();

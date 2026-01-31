@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
+import { blockUser, unblockUser } from '../services/authService';
 import './CustomersTable.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-const CustomersTable = () => {
+const CustomersTable = ({ userData }) => {
+  const isManager = userData?.userType === 'manager';
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRows, setSelectedRows] = useState([]);
@@ -65,6 +69,79 @@ const CustomersTable = () => {
     setSelectedCustomer(customer);
   };
 
+  // Fonction pour recharger les utilisateurs
+  const refreshUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/api/users`);
+      const data = await response.json();
+      
+      if (data.success && data.users) {
+        const formattedUsers = data.users.map((user, index) => ({
+          id: index + 1,
+          uid: user.uid,
+          name: user.displayName || user.email.split('@')[0],
+          email: user.email,
+          status: user.disabled ? 'Bloqué' : 'Actif',
+          provider: user.provider,
+          joinDate: user.creationTime ? new Date(user.creationTime).toLocaleDateString('fr-FR') : 'N/A',
+          lastLogin: user.lastSignInTime ? new Date(user.lastSignInTime).toLocaleDateString('fr-FR') : 'Jamais'
+        }));
+        setCustomers(formattedUsers);
+        
+        // Mettre à jour le selectedCustomer si nécessaire
+        if (selectedCustomer) {
+          const updated = formattedUsers.find(c => c.email === selectedCustomer.email);
+          if (updated) setSelectedCustomer(updated);
+        }
+      }
+    } catch (err) {
+      console.error('Erreur lors du rechargement:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Bloquer un utilisateur
+  const handleBlockUser = async (email) => {
+    setActionLoading(true);
+    setActionMessage(null);
+    try {
+      const result = await blockUser(email);
+      if (result.success) {
+        setActionMessage({ type: 'success', text: `✅ Utilisateur ${email} bloqué avec succès` });
+        await refreshUsers();
+      } else {
+        setActionMessage({ type: 'error', text: `❌ Erreur: ${result.error}` });
+      }
+    } catch (err) {
+      setActionMessage({ type: 'error', text: `❌ Erreur: ${err.message}` });
+    } finally {
+      setActionLoading(false);
+      setTimeout(() => setActionMessage(null), 5000);
+    }
+  };
+
+  // Débloquer un utilisateur
+  const handleUnblockUser = async (email) => {
+    setActionLoading(true);
+    setActionMessage(null);
+    try {
+      const result = await unblockUser(email);
+      if (result.success) {
+        setActionMessage({ type: 'success', text: `✅ Utilisateur ${email} débloqué avec succès` });
+        await refreshUsers();
+      } else {
+        setActionMessage({ type: 'error', text: `❌ Erreur: ${result.error}` });
+      }
+    } catch (err) {
+      setActionMessage({ type: 'error', text: `❌ Erreur: ${err.message}` });
+    } finally {
+      setActionLoading(false);
+      setTimeout(() => setActionMessage(null), 5000);
+    }
+  };
+
   const filteredCustomers = customers.filter(customer =>
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -73,6 +150,13 @@ const CustomersTable = () => {
   return (
     <div className="customers-page">
       <div className="customers-container">
+        {/* Action Message */}
+        {actionMessage && (
+          <div className={`action-message ${actionMessage.type}`}>
+            {actionMessage.text}
+          </div>
+        )}
+
         {/* Header Section */}
         <div className="customers-header">
           <div className="header-left">
@@ -262,11 +346,32 @@ const CustomersTable = () => {
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="panel-actions">
-              <button className="btn-primary">Debloquer</button>
-              <button className="btn-secondary btn-danger">Bloquer</button>
-            </div>
+            {/* Action Buttons - Manager only */}
+            {isManager ? (
+              <div className="panel-actions">
+                {selectedCustomer.status === 'Bloqué' ? (
+                  <button 
+                    className="btn-primary btn-unblock"
+                    onClick={() => handleUnblockUser(selectedCustomer.email)}
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? '⏳ Déblocage...' : '🔓 Débloquer'}
+                  </button>
+                ) : (
+                  <button 
+                    className="btn-secondary btn-danger"
+                    onClick={() => handleBlockUser(selectedCustomer.email)}
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? '⏳ Blocage...' : '🔒 Bloquer'}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="panel-actions">
+                <p className="no-permission">🔒 Seuls les managers peuvent bloquer/débloquer les utilisateurs</p>
+              </div>
+            )}
           </div>
         </div>
       )}
