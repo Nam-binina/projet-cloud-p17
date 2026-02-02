@@ -12,6 +12,10 @@
           <ion-button color="primary" @click="reloadPage">
             <ion-icon slot="icon-only" :icon="refreshOutline"></ion-icon>
           </ion-button>
+          <ion-button color="tertiary" @click="centrerSurMoi" :disabled="isLocating">
+            <ion-icon slot="start" :icon="locateOutline"></ion-icon>
+            <span>Me localiser</span>
+          </ion-button>
           <ion-button color="danger" @click="handleLogout">
             Déconnexion
             <ion-icon slot="end" :icon="logOutOutline"></ion-icon>
