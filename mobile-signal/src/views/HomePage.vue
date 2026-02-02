@@ -72,6 +72,7 @@ import {
   IonTitle,
   IonContent,
   IonButton,
+  IonButtons,
   IonItem,
   IonLabel,
   IonInput,
@@ -79,6 +80,7 @@ import {
   IonSelectOption
 } from '@ionic/vue';
 import L from 'leaflet';
+import { Geolocation } from '@capacitor/geolocation';
 import { getFirestore, collection, addDoc, Timestamp, GeoPoint } from 'firebase/firestore';
 import { useCollection, useCurrentUser } from 'vuefire';
 
@@ -190,7 +192,7 @@ async function validerSignalement() {
 function afficherMarkers() {
   // Supprimer tous les markers existants
   map.eachLayer((layer: any) => {
-    if (layer instanceof L.Marker) map.removeLayer(layer);
+    if (layer instanceof L.Marker && layer !== userMarker && layer !== nouveauMarker) map.removeLayer(layer);
   });
 
   // Ajouter les markers depuis Firebase avec couleur selon status
@@ -214,12 +216,42 @@ function afficherMarkers() {
   }
 }
 
+async function centrerSurMoi() {
+  if (!map) return;
+
+  isLocating.value = true;
+  try {
+    const pos = await Geolocation.getCurrentPosition({
+      enableHighAccuracy: true,
+      timeout: 10000
+    });
+
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+
+    // Centre la carte sur l'utilisateur
+    map.setView([lat, lng], 16);
+
+    // Marker "Moi"
+    if (userMarker) map.removeLayer(userMarker);
+    userMarker = L.marker([lat, lng]).addTo(map).bindPopup("📍 Moi").openPopup();
+  } catch (e) {
+    console.error("Localisation impossible :", e);
+    // Fallback : on ne casse rien, on laisse Antananarivo
+  } finally {
+    isLocating.value = false;
+  }
+}
+
 onMounted(() => {
   map = L.map('map').setView([-18.879, 47.508], 13);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
+
+  // Essayer de se centrer sur l'utilisateur
+  centrerSurMoi();
 
   setTimeout(() => {
     map.invalidateSize();
