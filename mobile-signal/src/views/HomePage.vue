@@ -3,12 +3,26 @@
     <ion-header>
       <ion-toolbar>
         <ion-title>Signalements</ion-title>
+
+        <ion-buttons slot="end">
+          <ion-button color="secondary" @click="toggleFilter" title="Basculer entre tous et mes signalements">
+            <ion-icon slot="start" :icon="funnelOutline"></ion-icon>
+            <span>{{ filterMineOnly ? 'Mes signalements' : 'Tous les signalements' }}</span>
+          </ion-button>
+          <ion-button color="primary" @click="reloadPage">
+            <ion-icon slot="icon-only" :icon="refreshOutline"></ion-icon>
+          </ion-button>
+          <ion-button color="danger" @click="handleLogout">
+            Déconnexion
+            <ion-icon slot="end" :icon="logOutOutline"></ion-icon>
+          </ion-button>
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
 
     <ion-content>
-      <!--  R�cap -->
-      <div class="recap">
+      <!--  Récap -->
+      <div class="recap" v-if="showRecap">
         <p><strong>Total :</strong> {{ totalSignalements }}</p>
         <p><strong>Surface :</strong> {{ totalSurface }} m²</p>
         <p><strong>Budget :</strong> {{ totalBudget }} Ar</p>
@@ -17,12 +31,42 @@
         <ion-button expand="block" color="primary" @click="activerSignalement">
            Signaler
         </ion-button>
+
+        <ion-button expand="block" color="light" @click="showRecap = !showRecap" title="Masquer récapitulatif" class="hide-recap-btn">
+          <ion-icon slot="start" :icon="eyeOffOutline"></ion-icon>
+          <span>Masquer recap</span>
+        </ion-button>
       </div>
 
       <!-- Main container: Carte + Formulaire side-by-side -->
       <div class="container">
         <!--  Carte -->
-        <div id="map" class="map-container"></div>
+        <div id="map" class="map-container">
+          <!-- Légende visible par défaut -->
+          <div class="map-legend-overlay">
+            <div class="legend-content">
+              <p class="legend-title">Légende des statuts</p>
+              <div class="legend-item">
+                <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png" alt="Nouveau" class="legend-icon">
+                <span>Nouveau</span>
+              </div>
+              <div class="legend-item">
+                <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png" alt="En cours" class="legend-icon">
+                <span>En cours</span>
+              </div>
+              <div class="legend-item">
+                <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png" alt="Terminé" class="legend-icon">
+                <span>Terminé</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bouton Voir recap en bas à gauche -->
+          <button class="see-recap-btn" @click="showRecap = !showRecap" :title="showRecap ? 'Masquer récapitulatif' : 'Afficher récapitulatif'">
+            <ion-icon :icon="showRecap ? eyeOffOutline : eyeOutline"></ion-icon>
+            <span>{{ showRecap ? 'Masquer recap' : 'Voir recap' }}</span>
+          </button>
+        </div>
 
         <!--  Formulaire � droite -->
         <div class="form" v-if="showForm">
@@ -39,6 +83,11 @@
           <ion-item>
             <ion-label position="floating">Description</ion-label>
             <ion-input v-model="form.description" placeholder="Decrivez le probleme"></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="floating">Entreprise concernée</ion-label>
+            <ion-input v-model="form.entreprise" placeholder="Nom de l'entreprise"></ion-input>
           </ion-item>
 
           <ion-item>
@@ -77,12 +126,22 @@ import {
   IonLabel,
   IonInput,
   IonSelect,
-  IonSelectOption
+  IonSelectOption,
+  IonButtons,
+  IonIcon
 } from '@ionic/vue';
 import L from 'leaflet';
 import { Geolocation } from '@capacitor/geolocation';
 import { getFirestore, collection, addDoc, Timestamp, GeoPoint } from 'firebase/firestore';
 import { useCollection, useCurrentUser } from 'vuefire';
+import { getAuth, signOut } from 'firebase/auth';
+import { useFirebaseAuth } from 'vuefire';
+import { logOutOutline, eyeOutline, eyeOffOutline, refreshOutline, funnelOutline } from 'ionicons/icons';
+import { useRouter } from 'vue-router';
+
+const auth = useFirebaseAuth();
+const router = useRouter();
+const showRecap = ref(true); // Affiche le recap par défaut
 
 /* =========================
     Donn�es
@@ -90,27 +149,56 @@ import { useCollection, useCurrentUser } from 'vuefire';
 const db = getFirestore();
 const currentUser = useCurrentUser();
 
+const filterMineOnly = ref(false); // false = afficher tous, true = seulement mes signalements
+
 //  R�cup�ration r�active des signalements depuis Firebase
 const signalements = useCollection(collection(db, 'signalements'));
+
+const filteredSignalements = computed(() => {
+  if (filterMineOnly.value && currentUser.value) {
+    return (signalements.value || []).filter((s: any) => s.user_id === currentUser.value?.uid);
+  }
+  return signalements.value || [];
+});
 
 /* =========================
     R�cap
    ========================= */
-const totalSignalements = computed(() => signalements.value?.length || 0);
+const totalSignalements = computed(() => filteredSignalements.value.length);
 
 const totalSurface = computed(() =>
-  signalements.value?.reduce((s: number, x: any) => s + (x.surface || 0), 0) || 0
+  filteredSignalements.value.reduce((s: number, x: any) => s + (x.surface || 0), 0)
 );
 
 const totalBudget = computed(() =>
-  signalements.value?.reduce((s: number, x: any) => s + (x.budget || 0), 0) || 0
+  filteredSignalements.value.reduce((s: number, x: any) => s + (x.budget || 0), 0)
 );
 
 const avancement = computed(() => {
-  if (!signalements.value || signalements.value.length === 0) return 0;
-  const t = signalements.value.filter((s: any) => s.status === 'termine').length;
-  return Math.round((t / signalements.value.length) * 100);
+  if (filteredSignalements.value.length === 0) return 0;
+  const t = filteredSignalements.value.filter((s: any) => s.status === 'termine').length;
+  return Math.round((t / filteredSignalements.value.length) * 100);
 });
+
+async function handleLogout() {
+  if (auth) {
+    try {
+      await signOut(auth);
+      // Optionnel : Rediriger l'utilisateur vers la page de login après déconnexion
+      router.push('/login'); 
+    } catch (error) {
+      console.error("Erreur lors de la déconnexion :", error);
+    }
+  }
+}
+
+function toggleFilter() {
+  filterMineOnly.value = !filterMineOnly.value;
+}
+
+function reloadPage() {
+  window.location.reload();
+}
 
 /* =========================
     Carte & Formulaire
@@ -124,6 +212,7 @@ const positionTemp = ref<{ lat: number; lng: number } | null>(null);
 const form = ref({
   statut: 'nouveau',
   description: '',
+  entreprise: '',
   surface: 0,
   budget: 0
 });
@@ -160,6 +249,10 @@ function activerSignalement() {
   alert('Cliquez sur la carte pour choisir la position');
 }
 
+function afficherFormulaireSignalement() {
+  showForm.value = true;
+}
+
 async function validerSignalement() {
   if (!positionTemp.value || !currentUser.value) return;
 
@@ -167,7 +260,8 @@ async function validerSignalement() {
     await addDoc(collection(db, 'signalements'), {
       budget: form.value.budget,
       date: Timestamp.now(),
-      descriptiotn: form.value.description,
+      description: form.value.description,
+      entreprise: form.value.entreprise,
       position: new GeoPoint(positionTemp.value.lat, positionTemp.value.lng),
       status: form.value.statut,
       surface: form.value.surface,
@@ -176,7 +270,7 @@ async function validerSignalement() {
 
     // reset
     showForm.value = false;
-    form.value = { statut: 'nouveau', description: '', surface: 0, budget: 0 };
+    form.value = { statut: 'nouveau', description: '', entreprise: '', surface: 0, budget: 0 };
     positionTemp.value = null;
 
     if (nouveauMarker) {
@@ -196,8 +290,8 @@ function afficherMarkers() {
   });
 
   // Ajouter les markers depuis Firebase avec couleur selon status
-  if (signalements.value) {
-    signalements.value.forEach((s: any) => {
+  if (filteredSignalements.value) {
+    filteredSignalements.value.forEach((s: any) => {
       if (s.position && s.position.latitude && s.position.longitude) {
         const icon = markerIcons[s.status as keyof typeof markerIcons] || markerIcons.nouveau;
         const marker = L.marker([s.position.latitude, s.position.longitude], { icon });
@@ -206,6 +300,8 @@ function afficherMarkers() {
         marker.bindPopup(`
           <b>Statut:</b> ${s.status}<br>
           <b>Surface:</b> ${s.surface} m²<br>
+          <b>Entreprise:</b> ${s.entreprise || 'N/A'}<br>
+          <b>Description:</b> ${s.description}<br>
           <b>Budget:</b> ${s.budget} Ar<br>
           <b>Date:</b> ${s.date?.toDate?.().toLocaleDateString() || 'N/A'}
         `);
@@ -244,7 +340,18 @@ async function centrerSurMoi() {
 }
 
 onMounted(() => {
-  map = L.map('map').setView([-18.879, 47.508], 13);
+  // Limiter la carte à la région d'Antananarivo
+  const anananarivo_bounds = L.latLngBounds(
+    [-19.2, 47.3], // Sud-Ouest
+    [-18.7, 47.8]  // Nord-Est
+  );
+
+  map = L.map('map', {
+    maxBounds: anananarivo_bounds,
+    maxBoundsViscosity: 1.0, // Empêche le déplacement en dehors des limites
+    minZoom: 11, // Zoom minimum pour voir toute la région
+    maxZoom: 17  // Zoom maximum permis
+  }).setView([-18.879, 47.508], 13);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
@@ -261,15 +368,32 @@ onMounted(() => {
 
   map.on('click', (e: any) => {
     positionTemp.value = e.latlng;
-    showForm.value = true;
 
     if (nouveauMarker) map.removeLayer(nouveauMarker);
+    
+    // Créer un marker avec un popup "Signale" cliquable
     nouveauMarker = L.marker(e.latlng).addTo(map);
+    
+    // Créer un popup personnalisé avec un lien cliquable
+    const popupContent = document.createElement('div');
+    popupContent.style.cursor = 'pointer';
+    popupContent.style.padding = '8px 12px';
+    popupContent.style.textAlign = 'center';
+    popupContent.style.fontWeight = 'bold';
+    popupContent.style.color = '#FF3838';
+    popupContent.textContent = 'Signale';
+    
+    // Ajouter le popup au marker
+    nouveauMarker.bindPopup(popupContent);
+    nouveauMarker.openPopup();
+    
+    // Ajouter l'event listener pour afficher le formulaire au clic
+    popupContent.addEventListener('click', afficherFormulaireSignalement);
   });
 });
 
-//  Mettre � jour les markers quand les donn�es Firebase changent
-watch(signalements, () => {
+//  Mettre à jour les markers quand les données Firebase changent ou le filtre change
+watch([signalements, filterMineOnly], () => {
   if (map) afficherMarkers();
 });
 </script>
@@ -284,16 +408,48 @@ watch(signalements, () => {
 }
 
 .recap {
-  padding: 12px;
-  background: #f4f4f4;
-  border-bottom: 1px solid #ddd;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #eae366 0%, #e2af2f 100%);
+  border-bottom: 2px solid #555;
   flex-shrink: 0;
   z-index: 10;
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .recap p {
   margin: 4px 0;
-  font-size: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  letter-spacing: 0.5px;
+}
+:deep(ion-button[color="light"]) {
+  --color: #FFD700 !important;
+  --background: rgba(255, 215, 0, 0.15) !important;
+  --border-radius: 8px !important;
+  font-weight: 600 !important;
+  --box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3) !important;
+  border: 1px solid rgba(255, 215, 0, 0.4) !important;
+}
+
+:deep(ion-button[color="light"]) ion-icon {
+  font-size: 24px !important;
+  color: #FFD700 !important;
+}
+
+:deep(ion-button[color="danger"]) {
+  background: white !important;
+  --color: #FF3838 !important;
+  --border-radius: 8px !important;
+  font-weight: 600 !important;
+  padding: 8px 12px !important;
+  /* border: 1px solid rgba(255, 56, 56, 0.3) !important; */
+  --box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+:deep(ion-button[color="danger"]) ion-icon {
+  color: #FF3838 !important;
 }
 
 .container {
@@ -338,5 +494,77 @@ watch(signalements, () => {
 
 .form ion-button {
   margin-top: 8px;
+}
+
+/* Styles pour la légende visible par défaut */
+.map-legend-overlay {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  background: white;
+  padding: 12px;
+  border-radius: 5px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+  font-size: 12px;
+  font-family: Arial, sans-serif;
+}
+
+.legend-content {
+  min-width: 140px;
+}
+
+.legend-title {
+  margin: 0 0 8px 0;
+  font-weight: bold;
+  text-decoration: underline;
+  font-size: 13px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  margin: 6px 0;
+  gap: 8px;
+}
+
+.legend-icon {
+  width: 20px;
+  height: 25px;
+  flex-shrink: 0;
+}
+
+.legend-item span {
+  font-size: 12px;
+  color: #333;
+}
+
+.see-recap-btn {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: 1000;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  color: white;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.see-recap-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.5);
+}
+
+.see-recap-btn ion-icon {
+  font-size: 18px;
 }
 </style>
