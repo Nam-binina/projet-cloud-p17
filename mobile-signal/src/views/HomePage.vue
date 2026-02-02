@@ -5,10 +5,6 @@
         <ion-title>Signalements</ion-title>
 
         <ion-buttons slot="end">
-          <ion-button color="secondary" @click="toggleFilter" title="Basculer entre tous et mes signalements">
-            <ion-icon slot="start" :icon="funnelOutline"></ion-icon>
-            <span>{{ filterMineOnly ? 'Mes signalements' : 'Tous les signalements' }}</span>
-          </ion-button>
           <ion-button color="primary" @click="reloadPage">
             <ion-icon slot="icon-only" :icon="refreshOutline"></ion-icon>
           </ion-button>
@@ -21,6 +17,18 @@
             <ion-icon slot="end" :icon="logOutOutline"></ion-icon>
           </ion-button>
         </ion-buttons>
+      </ion-toolbar>
+
+      <!-- UI Filtre : Tous / Mes signalements -->
+      <ion-toolbar>
+        <ion-segment v-model="filterMode">
+          <ion-segment-button value="tous">
+            <ion-label>Tous</ion-label>
+          </ion-segment-button>
+          <ion-segment-button value="moi">
+            <ion-label>Mes signalements</ion-label>
+          </ion-segment-button>
+        </ion-segment>
       </ion-toolbar>
     </ion-header>
 
@@ -72,7 +80,7 @@
           </button>
         </div>
 
-        <!--  Formulaire � droite -->
+        <!--  Formulaire à droite -->
         <div class="form" v-if="showForm">
           <h3>Nouveau signalement</h3>
           <ion-item>
@@ -131,8 +139,9 @@ import {
   IonInput,
   IonSelect,
   IonSelectOption,
-  IonButtons,
-  IonIcon
+  IonIcon,
+  IonSegment,
+  IonSegmentButton
 } from '@ionic/vue';
 import L from 'leaflet';
 import { Geolocation } from '@capacitor/geolocation';
@@ -140,7 +149,7 @@ import { getFirestore, collection, addDoc, Timestamp, GeoPoint } from 'firebase/
 import { useCollection, useCurrentUser } from 'vuefire';
 import { getAuth, signOut } from 'firebase/auth';
 import { useFirebaseAuth } from 'vuefire';
-import { logOutOutline, eyeOutline, eyeOffOutline, refreshOutline, funnelOutline } from 'ionicons/icons';
+import { logOutOutline, eyeOutline, eyeOffOutline, refreshOutline, locateOutline } from 'ionicons/icons';
 import { useRouter } from 'vue-router';
 
 const auth = useFirebaseAuth();
@@ -148,25 +157,28 @@ const router = useRouter();
 const showRecap = ref(true); // Affiche le recap par défaut
 
 /* =========================
-    Donn�es
+    Données
    ========================= */
 const db = getFirestore();
 const currentUser = useCurrentUser();
 
-const filterMineOnly = ref(false); // false = afficher tous, true = seulement mes signalements
+const filterMode = ref<string>('tous'); // 'tous' | 'moi'
 
-//  R�cup�ration r�active des signalements depuis Firebase
+//  Récupération réactive des signalements depuis Firebase
 const signalements = useCollection(collection(db, 'signalements'));
 
 const filteredSignalements = computed(() => {
-  if (filterMineOnly.value && currentUser.value) {
+  if (filterMode.value === 'moi') {
+    // Si pas connecté et filtreMode='moi' => []
+    if (!currentUser.value) return [];
     return (signalements.value || []).filter((s: any) => s.user_id === currentUser.value?.uid);
   }
+  // mode 'tous'
   return signalements.value || [];
 });
 
 /* =========================
-    R�cap
+    Récap
    ========================= */
 const totalSignalements = computed(() => filteredSignalements.value.length);
 
@@ -196,10 +208,6 @@ async function handleLogout() {
   }
 }
 
-function toggleFilter() {
-  filterMineOnly.value = !filterMineOnly.value;
-}
-
 function reloadPage() {
   window.location.reload();
 }
@@ -209,6 +217,8 @@ function reloadPage() {
    ========================= */
 let map: L.Map;
 let nouveauMarker: L.Marker | null = null;
+let userMarker: L.Marker | null = null;
+const isLocating = ref(false);
 
 const showForm = ref(false);
 const positionTemp = ref<{ lat: number; lng: number } | null>(null);
@@ -221,7 +231,7 @@ const form = ref({
   budget: 0
 });
 
-//  Ic�nes personnalis�es par statut
+//  Icônes personnalisées par statut
 const markerIcons = {
   nouveau: L.icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
@@ -265,7 +275,7 @@ async function validerSignalement() {
       budget: form.value.budget,
       date: Timestamp.now(),
       description: form.value.description,
-      entreprise: form.value.entreprise,
+      entreprise: form.value.entreprise || null, // N/A si vide
       position: new GeoPoint(positionTemp.value.lat, positionTemp.value.lng),
       status: form.value.statut,
       surface: form.value.surface,
@@ -397,13 +407,13 @@ onMounted(() => {
 });
 
 //  Mettre à jour les markers quand les données Firebase changent ou le filtre change
-watch([signalements, filterMineOnly], () => {
+watch([signalements, filterMode], () => {
   if (map) afficherMarkers();
 });
 </script>
 
 <style scoped>
-/* Permet � ion-content de flex correctement */
+/* Permet à ion-content de flex correctement */
 :deep(ion-content) {
   --padding-bottom: 0;
   --padding-top: 0;
@@ -500,72 +510,61 @@ watch([signalements, filterMineOnly], () => {
   margin-top: 8px;
 }
 
-/* Styles pour la légende visible par défaut */
+/* Styles pour la légende de la carte */
 .map-legend-overlay {
   position: absolute;
-  bottom: 20px;
-  right: 20px;
+  top: 10px;
+  right: 10px;
   z-index: 1000;
   background: white;
-  padding: 12px;
-  border-radius: 5px;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
-  font-size: 12px;
-  font-family: Arial, sans-serif;
-}
-
-.legend-content {
-  min-width: 140px;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  max-width: 150px;
 }
 
 .legend-title {
-  margin: 0 0 8px 0;
+  font-size: 12px;
   font-weight: bold;
-  text-decoration: underline;
-  font-size: 13px;
+  margin: 0 0 8px 0;
+  text-align: center;
+  color: #333;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  margin: 6px 0;
-  gap: 8px;
+  margin-bottom: 5px;
 }
 
 .legend-icon {
-  width: 20px;
+  width: 16px;
   height: 25px;
-  flex-shrink: 0;
+  margin-right: 8px;
 }
 
 .legend-item span {
   font-size: 12px;
-  color: #333;
+  color: #555;
 }
 
+/* Bouton Voir recap flottant */
 .see-recap-btn {
   position: absolute;
   bottom: 20px;
   left: 20px;
   z-index: 1000;
-  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
-  color: white;
+  background: white;
+  color: #333;
   border: none;
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 12px;
-  cursor: pointer;
+  border-radius: 20px;
+  padding: 8px 16px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.see-recap-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.5);
+  gap: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .see-recap-btn ion-icon {
