@@ -162,19 +162,18 @@ const showRecap = ref(true); // Affiche le recap par défaut
 const db = getFirestore();
 const currentUser = useCurrentUser();
 
-const filterMode = ref<string>('tous'); // 'tous' | 'moi'
+type FilterMode = 'tous' | 'moi';
+const filterMode = ref<FilterMode>('tous');
 
 //  Récupération réactive des signalements depuis Firebase
 const signalements = useCollection(collection(db, 'signalements'));
 
 const filteredSignalements = computed(() => {
-  if (filterMode.value === 'moi') {
-    // Si pas connecté et filtreMode='moi' => []
-    if (!currentUser.value) return [];
-    return (signalements.value || []).filter((s: any) => s.user_id === currentUser.value?.uid);
-  }
-  // mode 'tous'
-  return signalements.value || [];
+  const list = signalements.value || [];
+  if (filterMode.value === 'tous') return list;
+  const uid = currentUser.value?.uid;
+  if (!uid) return [];
+  return list.filter((s: any) => s.user_id === uid);
 });
 
 /* =========================
@@ -314,7 +313,7 @@ function afficherMarkers() {
         marker.bindPopup(`
           <b>Statut:</b> ${s.status}<br>
           <b>Surface:</b> ${s.surface} m²<br>
-          <b>Entreprise:</b> ${s.entreprise || 'N/A'}<br>
+          <b>Entreprise:</b> ${s.entreprise ?? 'N/A'}<br>
           <b>Description:</b> ${s.description}<br>
           <b>Budget:</b> ${s.budget} Ar<br>
           <b>Date:</b> ${s.date?.toDate?.().toLocaleDateString() || 'N/A'}
@@ -328,26 +327,22 @@ function afficherMarkers() {
 
 async function centrerSurMoi() {
   if (!map) return;
-
   isLocating.value = true;
   try {
     const pos = await Geolocation.getCurrentPosition({
       enableHighAccuracy: true,
       timeout: 10000
     });
-
     const lat = pos.coords.latitude;
     const lng = pos.coords.longitude;
 
-    // Centre la carte sur l'utilisateur
     map.setView([lat, lng], 16);
 
-    // Marker "Moi"
     if (userMarker) map.removeLayer(userMarker);
-    userMarker = L.marker([lat, lng]).addTo(map).bindPopup("📍 Moi").openPopup();
+    userMarker = L.marker([lat, lng]).addTo(map).bindPopup("📍 Moi");
   } catch (e) {
-    console.error("Localisation impossible :", e);
-    // Fallback : on ne casse rien, on laisse Antananarivo
+    console.error("Localisation impossible:", e);
+    // fallback : ne rien casser, garder Antananarivo
   } finally {
     isLocating.value = false;
   }
@@ -407,9 +402,7 @@ onMounted(() => {
 });
 
 //  Mettre à jour les markers quand les données Firebase changent ou le filtre change
-watch([signalements, filterMode], () => {
-  if (map) afficherMarkers();
-});
+watch([signalements, filterMode], () => afficherMarkers(), { deep: true });
 </script>
 
 <style scoped>
