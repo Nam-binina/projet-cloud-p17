@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import './Dashboard.css';
 
 // Determine API URL based on environment
@@ -19,6 +19,9 @@ const Dashboard = () => {
   const [lastSync, setLastSync] = useState('Never');
   const [syncResult, setSyncResult] = useState(null);
   const [syncError, setSyncError] = useState(null);
+  const [signalements, setSignalements] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -45,6 +48,194 @@ const Dashboard = () => {
       setIsSyncing(false);
     }
   };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchDashboardData = async () => {
+      setIsLoadingData(true);
+      try {
+        const [signalementsResponse, usersResponse] = await Promise.all([
+          fetch(`${API_URL}/api/signalements`),
+          fetch(`${API_URL}/api/users`)
+        ]);
+
+        const signalementsPayload = signalementsResponse.ok
+          ? await signalementsResponse.json()
+          : { signalements: [] };
+        const usersPayload = usersResponse.ok
+          ? await usersResponse.json()
+          : { users: [] };
+
+        if (isMounted) {
+          setSignalements(Array.isArray(signalementsPayload.signalements) ? signalementsPayload.signalements : []);
+          setUsers(Array.isArray(usersPayload.users) ? usersPayload.users : []);
+        }
+      } catch (error) {
+        console.error('Erreur chargement dashboard:', error);
+        if (isMounted) {
+          setSignalements([]);
+          setUsers([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingData(false);
+        }
+      }
+    };
+
+    fetchDashboardData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const { totalRevenue, activeUsers, totalSignalements, resolvedSignalements } = useMemo(() => {
+    const totalRevenueValue = signalements.reduce((sum, item) => {
+      const budget = Number(item.budget);
+      return Number.isFinite(budget) ? sum + budget : sum;
+    }, 0);
+
+    const activeUsersValue = users.filter(user => {
+      if (user.disabled) {
+        return false;
+      }
+
+      const lastSignIn = user.lastSignInTime || user.last_login || user.lastLogin;
+      if (!lastSignIn) {
+        return false;
+      }
+
+      const lastSignInDate = new Date(lastSignIn);
+      if (Number.isNaN(lastSignInDate.getTime())) {
+        return false;
+      }
+
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      return lastSignInDate >= thirtyDaysAgo;
+    }).length;
+
+    const resolvedStatuses = new Set(['termine', 'resolved', 'closed', 'done']);
+    const resolvedCount = signalements.filter(item =>
+      resolvedStatuses.has(String(item.status || '').toLowerCase())
+    ).length;
+
+    return {
+      totalRevenue: totalRevenueValue,
+      activeUsers: activeUsersValue,
+      totalSignalements: signalements.length,
+      resolvedSignalements: resolvedCount
+    };
+  }, [signalements, users]);
+
+  const monthlySignalements = useMemo(() => {
+    const buckets = new Map();
+    signalements.forEach(item => {
+      if (!item.date) {
+        return;
+      }
+      const date = new Date(item.date);
+      if (Number.isNaN(date.getTime())) {
+        return;
+      }
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      buckets.set(key, (buckets.get(key) || 0) + 1);
+    });
+
+    const sortedKeys = Array.from(buckets.keys()).sort();
+    const lastKeys = sortedKeys.slice(-6);
+    return lastKeys.map(key => {
+      const [year, month] = key.split('-');
+      return {
+        key,
+        label: new Date(Number(year), Number(month) - 1, 1).toLocaleDateString('fr-FR', { month: 'short' }),
+        value: buckets.get(key) || 0
+      };
+    });
+  }, [signalements]);
+
+  const budgetByType = useMemo(() => {
+    const totals = new Map();
+    signalements.forEach(item => {
+      const rawType = item.type || item.status || 'Autre';
+      const type = String(rawType).trim() || 'Autre';
+      const budget = Number(item.budget);
+      const safeBudget = Number.isFinite(budget) ? budget : 0;
+      totals.set(type, (totals.get(type) || 0) + safeBudget);
+    });
+
+    const entries = Array.from(totals.entries())
+      .map(([type, budget]) => ({ type, budget }))
+      .sort((a, b) => b.budget - a.budget);
+
+    if (entries.length > 4) {
+      const top = entries.slice(0, 4);
+      const restTotal = entries.slice(4).reduce((sum, item) => sum + item.budget, 0);
+      if (restTotal > 0) {
+        top.push({ type: 'Autres', budget: restTotal });
+      }
+      return top;
+    }
+
+    return entries;
+  }, [signalements]);
+
+  const statusBreakdown = useMemo(() => {
+    const totals = new Map();
+    signalements.forEach(item => {
+      const status = String(item.status || 'Autre').toLowerCase();
+      totals.set(status, (totals.get(status) || 0) + 1);
+    });
+    return Array.from(totals.entries()).map(([status, count]) => ({ status, count }));
+  }, [signalements]);
+
+  const hasData = !isLoadingData && (signalements.length > 0 || users.length > 0);
+
+  const formatCurrency = (value) => new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'MGA',
+    maximumFractionDigits: 0
+  }).format(value || 0);
+
+  const formatNumber = (value) => new Intl.NumberFormat('fr-FR').format(value || 0);
+
+  const budgetTotal = budgetByType.reduce((sum, item) => sum + item.budget, 0);
+  const pieColors = ['#F2A444', '#F27830', '#BE9086', '#A62C21', '#401511'];
+  const pieSegments = budgetByType.map((item, index) => {
+    const percentage = budgetTotal > 0 ? (item.budget / budgetTotal) * 100 : 0;
+    const circumference = 2 * Math.PI * 80;
+    const dash = (percentage / 100) * circumference;
+    const offset = budgetByType.slice(0, index).reduce((sum, prev) => {
+      const prevPercentage = budgetTotal > 0 ? (prev.budget / budgetTotal) * 100 : 0;
+      return sum + (prevPercentage / 100) * circumference;
+    }, 0);
+
+    return {
+      ...item,
+      percentage,
+      dash,
+      offset: -offset,
+      color: pieColors[index % pieColors.length]
+    };
+  });
+
+  const monthlyMax = monthlySignalements.reduce((max, item) => Math.max(max, item.value), 0) || 1;
+  const monthlyMid = Math.ceil(monthlyMax / 2);
+  const monthlyPoints = monthlySignalements.map((item, index) => {
+    const xStart = 60;
+    const xEnd = 360;
+    const yTop = 30;
+    const yBottom = 170;
+    const xStep = monthlySignalements.length > 1 ? (xEnd - xStart) / (monthlySignalements.length - 1) : 0;
+    const x = xStart + xStep * index;
+    const y = yBottom - (item.value / monthlyMax) * (yBottom - yTop);
+    return `${x},${y}`;
+  }).join(' ');
+
+  const statusMax = statusBreakdown.reduce((max, item) => Math.max(max, item.count), 0) || 1;
+  const recentSignalements = signalements.slice(0, 4);
 
   return (
     <div className="dashboard-container">
@@ -83,202 +274,178 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* KPIs */}
-      <div className="kpis-section">
-        <div className="kpi-card">
-          <div className="kpi-icon">📊</div>
-          <div className="kpi-content">
-            <p className="kpi-label">Total Revenue</p>
-            <p className="kpi-value">$124,500</p>
-            <p className="kpi-change positive">↑ 12.5% from last month</p>
-          </div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-icon">👥</div>
-          <div className="kpi-content">
-            <p className="kpi-label">Active Users</p>
-            <p className="kpi-value">2,453</p>
-            <p className="kpi-change positive">↑ 8.2% from last month</p>
-          </div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-icon">📈</div>
-          <div className="kpi-content">
-            <p className="kpi-label">Conversion Rate</p>
-            <p className="kpi-value">3.24%</p>
-            <p className="kpi-change positive">↑ 1.5% from last month</p>
-          </div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-icon">⚡</div>
-          <div className="kpi-content">
-            <p className="kpi-label">Performance</p>
-            <p className="kpi-value">98.5%</p>
-            <p className="kpi-change negative">↓ 0.3% from last month</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Charts Section */}
-      <div className="charts-grid">
-        {/* Revenue Chart */}
-        <div className="chart-card">
-          <h3>Revenue Trend</h3>
-          <div className="chart-container">
-            <svg viewBox="0 0 400 200" className="chart-svg">
-              {/* Grid */}
-              <line x1="40" y1="20" x2="40" y2="180" stroke="#ddd" strokeWidth="1" />
-              <line x1="40" y1="180" x2="390" y2="180" stroke="#ddd" strokeWidth="1" />
-              
-              {/* Y axis labels */}
-              <text x="35" y="185" fontSize="10" textAnchor="end" fill="#999">0</text>
-              <text x="35" y="135" fontSize="10" textAnchor="end" fill="#999">50k</text>
-              <text x="35" y="85" fontSize="10" textAnchor="end" fill="#999">100k</text>
-              <text x="35" y="35" fontSize="10" textAnchor="end" fill="#999">150k</text>
-
-              {/* Grid lines */}
-              <line x1="40" y1="130" x2="390" y2="130" stroke="#f0f0f0" strokeWidth="1" />
-              <line x1="40" y1="80" x2="390" y2="80" stroke="#f0f0f0" strokeWidth="1" />
-              <line x1="40" y1="30" x2="390" y2="30" stroke="#f0f0f0" strokeWidth="1" />
-
-              {/* Data line */}
-              <polyline
-                points="70,120 120,90 170,70 220,95 270,60 320,85 370,45"
-                fill="none"
-                stroke="#F2A444"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-
-              {/* Data points */}
-              <circle cx="70" cy="120" r="4" fill="#F2A444" />
-              <circle cx="120" cy="90" r="4" fill="#F2A444" />
-              <circle cx="170" cy="70" r="4" fill="#F2A444" />
-              <circle cx="220" cy="95" r="4" fill="#F2A444" />
-              <circle cx="270" cy="60" r="4" fill="#F2A444" />
-              <circle cx="320" cy="85" r="4" fill="#F2A444" />
-              <circle cx="370" cy="45" r="4" fill="#F2A444" />
-
-              {/* X axis labels */}
-              <text x="70" y="195" fontSize="10" textAnchor="middle" fill="#999">Jan</text>
-              <text x="120" y="195" fontSize="10" textAnchor="middle" fill="#999">Feb</text>
-              <text x="170" y="195" fontSize="10" textAnchor="middle" fill="#999">Mar</text>
-              <text x="220" y="195" fontSize="10" textAnchor="middle" fill="#999">Apr</text>
-              <text x="270" y="195" fontSize="10" textAnchor="middle" fill="#999">May</text>
-              <text x="320" y="195" fontSize="10" textAnchor="middle" fill="#999">Jun</text>
-              <text x="370" y="195" fontSize="10" textAnchor="middle" fill="#999">Jul</text>
-            </svg>
-          </div>
-        </div>
-
-        {/* User Growth */}
-        <div className="chart-card">
-          <h3>User Growth</h3>
-          <div className="chart-container">
-            <svg viewBox="0 0 400 200" className="chart-svg">
-              {/* Grid */}
-              <line x1="40" y1="20" x2="40" y2="180" stroke="#ddd" strokeWidth="1" />
-              <line x1="40" y1="180" x2="390" y2="180" stroke="#ddd" strokeWidth="1" />
-
-              {/* Bar chart */}
-              <rect x="60" y="110" width="30" height="70" fill="#F2A444" opacity="0.8" />
-              <rect x="105" y="95" width="30" height="85" fill="#F2A444" opacity="0.8" />
-              <rect x="150" y="80" width="30" height="100" fill="#F2A444" opacity="0.8" />
-              <rect x="195" y="65" width="30" height="115" fill="#F27830" opacity="0.8" />
-              <rect x="240" y="50" width="30" height="130" fill="#F27830" opacity="0.8" />
-              <rect x="285" y="35" width="30" height="145" fill="#F27830" opacity="0.8" />
-              <rect x="330" y="20" width="30" height="160" fill="#F27830" opacity="0.8" />
-
-              {/* Labels */}
-              <text x="75" y="195" fontSize="10" textAnchor="middle" fill="#999">W1</text>
-              <text x="120" y="195" fontSize="10" textAnchor="middle" fill="#999">W2</text>
-              <text x="165" y="195" fontSize="10" textAnchor="middle" fill="#999">W3</text>
-              <text x="210" y="195" fontSize="10" textAnchor="middle" fill="#999">W4</text>
-              <text x="255" y="195" fontSize="10" textAnchor="middle" fill="#999">W5</text>
-              <text x="300" y="195" fontSize="10" textAnchor="middle" fill="#999">W6</text>
-              <text x="345" y="195" fontSize="10" textAnchor="middle" fill="#999">W7</text>
-            </svg>
-          </div>
-        </div>
-
-        {/* Sales by Category */}
-        <div className="chart-card">
-          <h3>Sales by Category</h3>
-          <div className="pie-chart">
-            <svg viewBox="0 0 200 200" className="pie-svg">
-              {/* Electronics - 35% */}
-              <circle cx="100" cy="100" r="80" fill="none" stroke="#F2A444" strokeWidth="20" 
-                strokeDasharray="175.93 502.65" strokeDashoffset="0" />
-              
-              {/* Clothing - 25% */}
-              <circle cx="100" cy="100" r="80" fill="none" stroke="#F27830" strokeWidth="20" 
-                strokeDasharray="125.66 502.65" strokeDashoffset="-175.93" />
-              
-              {/* Food - 20% */}
-              <circle cx="100" cy="100" r="80" fill="none" stroke="#BE9086" strokeWidth="20" 
-                strokeDashoffset="-301.59" strokeDasharray="100.53 502.65" />
-              
-              {/* Other - 20% */}
-              <circle cx="100" cy="100" r="80" fill="none" stroke="#A62C21" strokeWidth="20" 
-                strokeDashoffset="-402.12" strokeDasharray="100.53 502.65" />
-            </svg>
-            <div className="pie-legend">
-              <div className="legend-item">
-                <span className="legend-color" style={{backgroundColor: '#F2A444'}}></span>
-                <span>Electronics (35%)</span>
+      {hasData && (
+        <>
+          {/* KPIs */}
+          <div className="kpis-section">
+            <div className="kpi-card">
+              <div className="kpi-icon">📊</div>
+              <div className="kpi-content">
+                <p className="kpi-label">Total Revenue</p>
+                <p className="kpi-value">{formatCurrency(totalRevenue)}</p>
+                <p className="kpi-change">Budget total des signalements</p>
               </div>
-              <div className="legend-item">
-                <span className="legend-color" style={{backgroundColor: '#F27830'}}></span>
-                <span>Clothing (25%)</span>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-icon">👥</div>
+              <div className="kpi-content">
+                <p className="kpi-label">Active Users</p>
+                <p className="kpi-value">{formatNumber(activeUsers)}</p>
+                <p className="kpi-change">30 derniers jours</p>
               </div>
-              <div className="legend-item">
-                <span className="legend-color" style={{backgroundColor: '#BE9086'}}></span>
-                <span>Food (20%)</span>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-icon">🧾</div>
+              <div className="kpi-content">
+                <p className="kpi-label">Total Signalements</p>
+                <p className="kpi-value">{formatNumber(totalSignalements)}</p>
+                <p className="kpi-change">Tous statuts</p>
               </div>
-              <div className="legend-item">
-                <span className="legend-color" style={{backgroundColor: '#A62C21'}}></span>
-                <span>Other (20%)</span>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-icon">✅</div>
+              <div className="kpi-content">
+                <p className="kpi-label">Signalements Résolus</p>
+                <p className="kpi-value">{formatNumber(resolvedSignalements)}</p>
+                <p className="kpi-change">Terminé / Closed</p>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Recent Activity */}
-        <div className="chart-card">
-          <h3>Recent Activity</h3>
-          <div className="activity-list">
-            <div className="activity-item">
-              <div className="activity-icon">📝</div>
-              <div className="activity-content">
-                <p className="activity-title">New order received</p>
-                <p className="activity-time">2 hours ago</p>
+          {/* Charts Section */}
+          <div className="charts-grid">
+            {signalements.length > 0 && monthlySignalements.length > 0 && (
+              <div className="chart-card">
+                <h3>Signalements par mois</h3>
+                <div className="chart-container">
+                  <svg viewBox="0 0 400 200" className="chart-svg">
+                    <line x1="50" y1="20" x2="50" y2="180" stroke="#ddd" strokeWidth="1" />
+                    <line x1="50" y1="180" x2="380" y2="180" stroke="#ddd" strokeWidth="1" />
+
+                    <text x="45" y="185" fontSize="10" textAnchor="end" fill="#999">0</text>
+                    <text x="45" y="110" fontSize="10" textAnchor="end" fill="#999">{monthlyMid}</text>
+                    <text x="45" y="35" fontSize="10" textAnchor="end" fill="#999">{monthlyMax}</text>
+
+                    <line x1="50" y1="110" x2="380" y2="110" stroke="#f0f0f0" strokeWidth="1" />
+                    <line x1="50" y1="35" x2="380" y2="35" stroke="#f0f0f0" strokeWidth="1" />
+
+                    <polyline
+                      points={monthlyPoints}
+                      fill="none"
+                      stroke="#F2A444"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+
+                    {monthlySignalements.map((item, index) => {
+                      const xStart = 60;
+                      const xEnd = 360;
+                      const yTop = 30;
+                      const yBottom = 170;
+                      const xStep = monthlySignalements.length > 1 ? (xEnd - xStart) / (monthlySignalements.length - 1) : 0;
+                      const x = xStart + xStep * index;
+                      const y = yBottom - (item.value / monthlyMax) * (yBottom - yTop);
+                      return (
+                        <circle key={item.key} cx={x} cy={y} r="4" fill="#F2A444" />
+                      );
+                    })}
+
+                    {monthlySignalements.map((item, index) => {
+                      const xStart = 60;
+                      const xEnd = 360;
+                      const xStep = monthlySignalements.length > 1 ? (xEnd - xStart) / (monthlySignalements.length - 1) : 0;
+                      const x = xStart + xStep * index;
+                      return (
+                        <text key={`${item.key}-label`} x={x} y="195" fontSize="10" textAnchor="middle" fill="#999">
+                          {item.label}
+                        </text>
+                      );
+                    })}
+                  </svg>
+                </div>
               </div>
-            </div>
-            <div className="activity-item">
-              <div className="activity-icon">👤</div>
-              <div className="activity-content">
-                <p className="activity-title">New customer signed up</p>
-                <p className="activity-time">4 hours ago</p>
+            )}
+
+            {signalements.length > 0 && budgetByType.length > 0 && (
+              <div className="chart-card">
+                <h3>Budget par type de signalement</h3>
+                <div className="pie-chart">
+                  <svg viewBox="0 0 200 200" className="pie-svg">
+                    {pieSegments.map(segment => (
+                      <circle
+                        key={segment.type}
+                        cx="100"
+                        cy="100"
+                        r="80"
+                        fill="none"
+                        stroke={segment.color}
+                        strokeWidth="20"
+                        strokeDasharray={`${segment.dash} ${2 * Math.PI * 80}`}
+                        strokeDashoffset={segment.offset}
+                      />
+                    ))}
+                  </svg>
+                  <div className="pie-legend">
+                    {pieSegments.map(segment => (
+                      <div className="legend-item" key={`${segment.type}-legend`}>
+                        <span className="legend-color" style={{ backgroundColor: segment.color }}></span>
+                        <span>{segment.type} ({segment.percentage.toFixed(0)}%)</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="activity-item">
-              <div className="activity-icon">💳</div>
-              <div className="activity-content">
-                <p className="activity-title">Payment processed</p>
-                <p className="activity-time">6 hours ago</p>
+            )}
+
+            {signalements.length > 0 && statusBreakdown.length > 0 && (
+              <div className="chart-card">
+                <h3>Signalements par statut</h3>
+                <div className="chart-container">
+                  <svg viewBox="0 0 400 200" className="chart-svg">
+                    <line x1="40" y1="20" x2="40" y2="180" stroke="#ddd" strokeWidth="1" />
+                    <line x1="40" y1="180" x2="390" y2="180" stroke="#ddd" strokeWidth="1" />
+                    {statusBreakdown.map((item, index) => {
+                      const barWidth = 28;
+                      const gap = 18;
+                      const x = 60 + index * (barWidth + gap);
+                      const height = (item.count / statusMax) * 140;
+                      const y = 180 - height;
+                      return (
+                        <g key={item.status}>
+                          <rect x={x} y={y} width={barWidth} height={height} fill="#F2A444" opacity="0.8" />
+                          <text x={x + barWidth / 2} y="195" fontSize="10" textAnchor="middle" fill="#999">
+                            {item.status}
+                          </text>
+                        </g>
+                      );
+                    })}
+                  </svg>
+                </div>
               </div>
-            </div>
-            <div className="activity-item">
-              <div className="activity-icon">📦</div>
-              <div className="activity-content">
-                <p className="activity-title">Shipment shipped</p>
-                <p className="activity-time">1 day ago</p>
+            )}
+
+            {signalements.length > 0 && (
+              <div className="chart-card">
+                <h3>Derniers signalements</h3>
+                <div className="activity-list">
+                  {recentSignalements.map(item => (
+                    <div className="activity-item" key={item.id || item.date || item.description || item.title}>
+                      <div className="activity-icon">📝</div>
+                      <div className="activity-content">
+                        <p className="activity-title">{item.description || item.title || 'Signalement'}</p>
+                        <p className="activity-time">
+                          {item.date ? new Date(item.date).toLocaleString('fr-FR') : 'Date inconnue'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 };

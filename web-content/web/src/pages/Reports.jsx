@@ -12,6 +12,8 @@ const Reports = () => {
   const [filterType, setFilterType] = useState('all');
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   // Fetch signalements from API
   useEffect(() => {
@@ -23,16 +25,14 @@ const Reports = () => {
         
         if (data.success && data.signalements) {
           // Transform API data to match table format
-          const formattedReports = data.signalements.map((sig, index) => ({
+          const formattedReports = data.signalements.map((sig) => ({
             id: sig.id,
-            title: sig.title || 'Sans titre',
-            type: sig.type || 'Support',
+            title: sig.description || 'Sans titre',
+            type: sig.status || 'nouveau',
             severity: sig.severity || 'Medium',
-            status: sig.status === 'pending' ? 'Open' : 
-                   sig.status === 'in_review' ? 'In Review' : 
-                   sig.status === 'resolved' ? 'Resolved' : sig.status || 'Open',
-            reportedBy: sig.reportedBy || 'Anonymous',
-            reportDate: sig.createdAt ? new Date(sig.createdAt).toLocaleDateString('fr-FR') : 'N/A',
+            status: sig.status || 'nouveau',
+            reportedBy: sig.user_id || 'Anonymous',
+            reportDate: sig.date ? new Date(sig.date).toLocaleDateString('fr-FR') : 'N/A',
             description: sig.description || ''
           }));
           setReports(formattedReports);
@@ -54,11 +54,11 @@ const Reports = () => {
     fetchSignalements();
   }, []);
 
-  const handleSelectAll = (e) => {
+  const handleSelectAll = (e, pageReports) => {
     if (e.target.checked) {
-      setSelectedRows(reports.map(r => r.id));
+      setSelectedRows(prev => Array.from(new Set([...prev, ...pageReports.map(r => r.id)])));
     } else {
-      setSelectedRows([]);
+      setSelectedRows(prev => prev.filter(id => !pageReports.some(report => report.id === id)));
     }
   };
 
@@ -102,6 +102,16 @@ const Reports = () => {
      report.description.toLowerCase().includes(searchTerm.toLowerCase())) &&
     (filterType === 'all' || report.type === filterType)
   );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterType, reports.length]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredReports.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const paginatedReports = filteredReports.slice(startIndex, startIndex + pageSize);
+  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1);
 
   const reportStats = {
     total: reports.length,
@@ -163,7 +173,7 @@ const Reports = () => {
         <div className="filter-section">
           <label className="filter-label">Filter by Type:</label>
           <div className="filter-buttons">
-            {['all', 'Fraud', 'Content', 'Payment', 'Support', 'Bug', 'Security'].map(type => (
+            {['all', 'nouveau', 'en_attente', 'planifie', 'en_cours', 'termine'].map(type => (
               <button
                 key={type}
                 className={`filter-chip ${filterType === type ? 'active' : ''}`}
@@ -189,8 +199,8 @@ const Reports = () => {
                 <th className="checkbox-col">
                   <input
                     type="checkbox"
-                    checked={selectedRows.length === filteredReports.length && filteredReports.length > 0}
-                    onChange={handleSelectAll}
+                    checked={paginatedReports.length > 0 && paginatedReports.every(report => selectedRows.includes(report.id))}
+                    onChange={(e) => handleSelectAll(e, paginatedReports)}
                     className="select-all-checkbox"
                   />
                 </th>
@@ -204,7 +214,7 @@ const Reports = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredReports.map((report) => (
+              {paginatedReports.map((report) => (
                 <tr 
                   key={report.id} 
                   className={`${selectedRows.includes(report.id) ? 'selected' : ''} ${selectedReport?.id === report.id ? 'highlighted' : ''}`}
@@ -248,6 +258,37 @@ const Reports = () => {
           </table>
           )}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="pagination">
+            <button
+              className="pagination-btn"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={safePage === 1}
+            >
+              ← Previous
+            </button>
+            <div className="page-numbers">
+              {pageNumbers.map(page => (
+                <button
+                  key={page}
+                  className={`page-number ${safePage === page ? 'active' : ''}`}
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+            <button
+              className="pagination-btn"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={safePage === totalPages}
+            >
+              Next →
+            </button>
+          </div>
+        )}
 
         {/* Bulk Actions Bar */}
         {selectedRows.length > 0 && (
