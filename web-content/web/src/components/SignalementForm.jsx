@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import '../styles/SignalementForm.css';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 const SignalementForm = ({ location, onClose, onSubmit }) => {
   // Get user_id from localStorage (from auth data)
   const authData = JSON.parse(localStorage.getItem('authData') || '{}');
@@ -11,7 +13,6 @@ const SignalementForm = ({ location, onClose, onSubmit }) => {
     surface: '',
     budget: '',
     entreprise: '',
-    status: 'en_attente',
     position: {
       lat: location?.lat || 0,
       lng: location?.lng || 0
@@ -23,6 +24,7 @@ const SignalementForm = ({ location, onClose, onSubmit }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [photos, setPhotos] = useState([]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -51,23 +53,32 @@ const SignalementForm = ({ location, onClose, onSubmit }) => {
     }
   };
 
+  const handlePhotosChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    setPhotos(files);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
+      // Formater la position comme un GeoPoint Firebase
+      const formatPosition = (lat, lng) => {
+        return {
+          latitude: parseFloat(lat.toFixed(14)),
+          longitude: parseFloat(lng.toFixed(14))
+        };
+      };
+
       // Préparer les données au format attendu
       const payload = {
-        description: formData.description,
+        descriptiotn: formData.description,
         surface: formData.surface,
         budget: formData.budget,
         entreprise: formData.entreprise,
-        status: formData.status,
-        position: {
-          lat: formData.position.lat,
-          lng: formData.position.lng
-        },
+        position: formatPosition(formData.position.lat, formData.position.lng),
         date: formData.date,
         user_id: formData.user_id
       };
@@ -75,7 +86,7 @@ const SignalementForm = ({ location, onClose, onSubmit }) => {
       console.log('Envoi des données:', payload);
 
       // Envoyer à l'API
-      const response = await fetch('http://localhost:3000/api/signalements', {
+      const response = await fetch(`${API_URL}/api/signalements`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -85,11 +96,34 @@ const SignalementForm = ({ location, onClose, onSubmit }) => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Erreur lors de la création');
+        const fieldErrors = Object.entries(errorData)
+          .filter(([key, value]) => key !== 'error' && value)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(' | ');
+        const errorMessage = fieldErrors ? `${errorData.error || 'Erreur lors de la création'} - ${fieldErrors}` : (errorData.error || 'Erreur lors de la création');
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
       console.log('Réponse du serveur:', result);
+
+      const signalementId = result.signalement?.id;
+      if (signalementId && photos.length > 0) {
+        const formData = new FormData();
+        photos.forEach((file) => {
+          formData.append('photos', file);
+        });
+
+        const uploadResponse = await fetch(`${API_URL}/api/signalements/${signalementId}/photos`, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!uploadResponse.ok) {
+          const uploadError = await uploadResponse.json().catch(() => ({}));
+          throw new Error(uploadError.error || 'Erreur lors de l\'upload des photos');
+        }
+      }
 
       setSuccess(true);
       setTimeout(() => {
@@ -238,20 +272,24 @@ const SignalementForm = ({ location, onClose, onSubmit }) => {
               </div>
             </div>
 
+          </div>
+
+          {/* Photos */}
+          <div className="form-section">
+            <h3>Photos</h3>
             <div className="form-group">
-              <label htmlFor="status">Statut (String) *</label>
-              <select
-                id="status"
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-                required
-              >
-                <option value="en_attente">En attente</option>
-                <option value="planifie">Planifié</option>
-                <option value="en_cours">En cours</option>
-                <option value="termine">Terminé</option>
-              </select>
+              <label htmlFor="photos">Ajouter des photos</label>
+              <input
+                type="file"
+                id="photos"
+                name="photos"
+                accept="image/*"
+                multiple
+                onChange={handlePhotosChange}
+              />
+              {photos.length > 0 && (
+                <small className="form-hint">{photos.length} photo(s) sélectionnée(s)</small>
+              )}
             </div>
           </div>
 
@@ -260,14 +298,17 @@ const SignalementForm = ({ location, onClose, onSubmit }) => {
             <h3>Aperçu des données à envoyer</h3>
             <pre className="data-preview">
 {JSON.stringify({
-  description: formData.description || 'vide',
+  descriptiotn: formData.description || 'vide',
   surface: formData.surface || 'vide',
   budget: formData.budget || 'vide',
   entreprise: formData.entreprise || 'vide',
-  status: formData.status,
-  position: `[${formData.position.lat}° S, ${formData.position.lng}° E]`,
+  position: {
+    latitude: parseFloat(formData.position.lat.toFixed(14)),
+    longitude: parseFloat(formData.position.lng.toFixed(14))
+  },
   date: formData.date,
-  user_id: formData.user_id || 'vide'
+  user_id: formData.user_id || 'vide',
+  photos: photos.length
 }, null, 2)}
             </pre>
           </div>

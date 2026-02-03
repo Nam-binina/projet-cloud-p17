@@ -2,6 +2,7 @@ const express = require('express');
 const router = require("./routes");
 const cors = require("cors");
 const cookieParser = require('cookie-parser');
+const path = require('path');
 require("dotenv").config();
 
 const SERVER_PORT = process.env.SERVER_PORT || 3000;
@@ -18,6 +19,9 @@ app.use(cors({
 
 app.use(express.json());
 app.use(cookieParser());
+
+const uploadsPath = path.resolve(__dirname, '../../web-content/web/public/uploads');
+app.use('/uploads', express.static(uploadsPath));
 
 
 app.use(router);

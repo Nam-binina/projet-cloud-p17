@@ -20,7 +20,6 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID
 };
 
-// Initialize Firebase only if config is valid (all keys present and not empty)
 let firebaseInitialized = false;
 if (firebaseConfig.apiKey && firebaseConfig.projectId) {
   try {

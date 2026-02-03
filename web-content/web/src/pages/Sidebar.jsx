@@ -2,18 +2,22 @@ import { useState } from 'react';
 import './Sidebar.css';
 
 const Sidebar = ({ onMenuClick, expanded: propExpanded = true, onToggle, userData, onLogout }) => {
-  const [activeMenu, setActiveMenu] = useState('Dashboard');
+  const userType = userData?.userType || 'visitor';
+  const [activeMenu, setActiveMenu] = useState(userType === 'visitor' ? 'Map' : userType === 'user' ? 'Users' : 'Dashboard');
 
-  const menuItems = [
-    { name: 'Dashboard', icon: '', submenu: ['Activity', 'Traffic', 'Statistic'] },
-    { name: 'Users', icon: '', link: 'customers' },
-    { name: 'Reports Type', icon: '', link: 'reports' },
-    { name: 'Reports', icon: '', link: 'reportsall' },
-    { name: 'Map', icon: '', link: 'map' },
-    { name: 'Invoices', icon: '' },
-    { name: 'Wallet', icon: '' },
-    { name: 'Notification', icon: '' },
+  // All menu items with role restrictions
+  const allMenuItems = [
+    { name: 'Dashboard', icon: '📊', link: 'dashboard', roles: ['manager'] },
+    { name: 'Users', icon: '👥', link: 'customers', roles: ['manager', 'user'] },
+    { name: 'Reports', icon: '📋', link: 'reports', roles: ['manager', 'user'] },
+    { name: 'Map', icon: '🗺️', link: 'map', roles: ['manager', 'user', 'visitor'] },
+    { name: 'Invoices', icon: '🧾', roles: ['manager', 'user'] },
+    { name: 'Wallet', icon: '💰', roles: ['manager', 'user'] },
+    { name: 'Notification', icon: '🔔', roles: ['manager', 'user'] },
   ];
+
+  // Filter menu items based on user role
+  const menuItems = allMenuItems.filter(item => item.roles.includes(userType));
 
   const handleMenuClick = (item) => {
     setActiveMenu(item.name);

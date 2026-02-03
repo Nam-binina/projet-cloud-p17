@@ -7,7 +7,7 @@ const Login = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [userType, setUserType] = useState('visitor');
+  const [userType, setUserType] = useState('manager');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [connectionStatus, setConnectionStatus] = useState(isOnline() ? 'online' : 'offline');
@@ -197,10 +197,33 @@ const Login = ({ onLogin }) => {
                 </button>
               </p>
             </div>
+
+            {/* Visitor Access Button */}
+            <div className="visitor-access-section">
+              <div className="divider">
+                <span>ou</span>
+              </div>
+              <button
+                type="button"
+                className="visitor-btn"
+                disabled={loading}
+                onClick={() => {
+                  onLogin({
+                    user: { email: 'visiteur@guest.com', displayName: 'Visiteur' },
+                    userType: 'visitor',
+                    provider: 'guest',
+                    isGuest: true
+                  });
+                }}
+              >
+                <span className="visitor-icon">👤</span>
+                Accéder en tant que visiteur
+              </button>
+            </div>
           </form>
 
           {/* User Type Selection */}
-          <div className="user-type-section">
+          {/* <div className="user-type-section">
             <p className="user-type-label">Select User Type</p>
             <div className="user-type-buttons">
               <label className="radio-option">
@@ -234,7 +257,7 @@ const Login = ({ onLogin }) => {
                 <span>Manager</span>
               </label>
             </div>
-          </div>
+          </div> */}
 
           {/* Demo Credentials */}
           <div className="demo-section">

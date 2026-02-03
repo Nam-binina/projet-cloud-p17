@@ -1,10 +1,11 @@
 const bcrypt = require("bcrypt");
-const { getFirebaseAdmin } = require("../config/firebase");
+// const { getFirebaseAdmin } = require("../config/firebase");
+const admin = require("../config/firebase-admin");
+
 const { executeQuery } = require("../config/postgresql");
 
 async function getAllFirebaseUsers() {
-  const admin = getFirebaseAdmin();
-  const listUsersResult = await admin.auth().listUsers();
+    const listUsersResult = await admin.auth().listUsers();
   
   return listUsersResult.users.map(user => ({
     firebase_uid: user.uid,
@@ -59,8 +60,6 @@ async function syncFirebaseToPostgreSQL() {
 
 async function syncPostgreSQLToFirebase() {
   console.log("Synchronisation PostgreSQL → Firebase...");
-  
-  const admin = getFirebaseAdmin();
   const pgUsers = await getAllPostgreSQLUsers();
   let created = 0, updated = 0;
 

@@ -1,18 +1,23 @@
 import { useState, useEffect } from 'react';
+import { blockUser, unblockUser } from '../services/authService';
 import './CustomersTable.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-const CustomersTable = () => {
+const CustomersTable = ({ userData }) => {
+  const isManager = userData?.userType === 'manager';
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
-  // Fetch users from API
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -21,7 +26,6 @@ const CustomersTable = () => {
         const data = await response.json();
         
         if (data.success && data.users) {
-          // Transform API data to match table format
           const formattedUsers = data.users.map((user, index) => ({
             id: index + 1,
             uid: user.uid,
@@ -45,11 +49,11 @@ const CustomersTable = () => {
     fetchUsers();
   }, []);
 
-  const handleSelectAll = (e) => {
+  const handleSelectAll = (e, pageCustomers) => {
     if (e.target.checked) {
-      setSelectedRows(customers.map(c => c.id));
+      setSelectedRows(prev => Array.from(new Set([...prev, ...pageCustomers.map(c => c.id)])));
     } else {
-      setSelectedRows([]);
+      setSelectedRows(prev => prev.filter(id => !pageCustomers.some(customer => customer.id === id)));
     }
   };
 
@@ -65,14 +69,102 @@ const CustomersTable = () => {
     setSelectedCustomer(customer);
   };
 
+  const refreshUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/api/users`);
+      const data = await response.json();
+      
+      if (data.success && data.users) {
+        const formattedUsers = data.users.map((user, index) => ({
+          id: index + 1,
+          uid: user.uid,
+          name: user.displayName || user.email.split('@')[0],
+          email: user.email,
+          status: user.disabled ? 'Bloqué' : 'Actif',
+          provider: user.provider,
+          joinDate: user.creationTime ? new Date(user.creationTime).toLocaleDateString('fr-FR') : 'N/A',
+          lastLogin: user.lastSignInTime ? new Date(user.lastSignInTime).toLocaleDateString('fr-FR') : 'Jamais'
+        }));
+        setCustomers(formattedUsers);
+        
+        if (selectedCustomer) {
+          const updated = formattedUsers.find(c => c.email === selectedCustomer.email);
+          if (updated) setSelectedCustomer(updated);
+        }
+      }
+    } catch (err) {
+      console.error('Erreur lors du rechargement:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Bloquer un utilisateur
+  const handleBlockUser = async (email) => {
+    setActionLoading(true);
+    setActionMessage(null);
+    try {
+      const result = await blockUser(email);
+      if (result.success) {
+        setActionMessage({ type: 'success', text: `✅ Utilisateur ${email} bloqué avec succès` });
+        await refreshUsers();
+      } else {
+        setActionMessage({ type: 'error', text: `❌ Erreur: ${result.error}` });
+      }
+    } catch (err) {
+      setActionMessage({ type: 'error', text: `❌ Erreur: ${err.message}` });
+    } finally {
+      setActionLoading(false);
+      setTimeout(() => setActionMessage(null), 5000);
+    }
+  };
+
+  // Débloquer un utilisateur
+  const handleUnblockUser = async (email) => {
+    setActionLoading(true);
+    setActionMessage(null);
+    try {
+      const result = await unblockUser(email);
+      if (result.success) {
+        setActionMessage({ type: 'success', text: `✅ Utilisateur ${email} débloqué avec succès` });
+        await refreshUsers();
+      } else {
+        setActionMessage({ type: 'error', text: `❌ Erreur: ${result.error}` });
+      }
+    } catch (err) {
+      setActionMessage({ type: 'error', text: `❌ Erreur: ${err.message}` });
+    } finally {
+      setActionLoading(false);
+      setTimeout(() => setActionMessage(null), 5000);
+    }
+  };
+
   const filteredCustomers = customers.filter(customer =>
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, customers.length]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const paginatedCustomers = filteredCustomers.slice(startIndex, startIndex + pageSize);
+  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1);
+
   return (
     <div className="customers-page">
       <div className="customers-container">
+        {/* Action Message */}
+        {actionMessage && (
+          <div className={`action-message ${actionMessage.type}`}>
+            {actionMessage.text}
+          </div>
+        )}
+
         {/* Header Section */}
         <div className="customers-header">
           <div className="header-left">
@@ -132,8 +224,8 @@ const CustomersTable = () => {
                 <th className="checkbox-col">
                   <input
                     type="checkbox"
-                    checked={selectedRows.length === customers.length && customers.length > 0}
-                    onChange={handleSelectAll}
+                    checked={paginatedCustomers.length > 0 && paginatedCustomers.every(customer => selectedRows.includes(customer.id))}
+                    onChange={(e) => handleSelectAll(e, paginatedCustomers)}
                     className="select-all-checkbox"
                   />
                 </th>
@@ -147,7 +239,7 @@ const CustomersTable = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredCustomers.map((customer) => (
+              {paginatedCustomers.map((customer) => (
                 <tr 
                   key={customer.id} 
                   className={`${selectedRows.includes(customer.id) ? 'selected' : ''} ${selectedCustomer?.id === customer.id ? 'highlighted' : ''}`}
@@ -198,17 +290,35 @@ const CustomersTable = () => {
           )}
 
         {/* Pagination */}
-        <div className="pagination">
-          <button className="pagination-btn">← Previous</button>
-          <div className="page-numbers">
-            <button className="page-number active">1</button>
-            <button className="page-number">2</button>
-            <button className="page-number">3</button>
-            <span className="pagination-dots">...</span>
-            <button className="page-number">10</button>
+        {totalPages > 1 && (
+          <div className="pagination">
+            <button
+              className="pagination-btn"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={safePage === 1}
+            >
+              ← Previous
+            </button>
+            <div className="page-numbers">
+              {pageNumbers.map(page => (
+                <button
+                  key={page}
+                  className={`page-number ${safePage === page ? 'active' : ''}`}
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+            <button
+              className="pagination-btn"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={safePage === totalPages}
+            >
+              Next →
+            </button>
           </div>
-          <button className="pagination-btn">Next →</button>
-        </div>
+        )}
       </div>
 
       {/* Customer Details Panel */}
@@ -262,11 +372,32 @@ const CustomersTable = () => {
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="panel-actions">
-              <button className="btn-primary">Debloquer</button>
-              <button className="btn-secondary btn-danger">Bloquer</button>
-            </div>
+            {/* Action Buttons - Manager only */}
+            {isManager ? (
+              <div className="panel-actions">
+                {selectedCustomer.status === 'Bloqué' ? (
+                  <button 
+                    className="btn-primary btn-unblock"
+                    onClick={() => handleUnblockUser(selectedCustomer.email)}
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? '⏳ Déblocage...' : '🔓 Débloquer'}
+                  </button>
+                ) : (
+                  <button 
+                    className="btn-secondary btn-danger"
+                    onClick={() => handleBlockUser(selectedCustomer.email)}
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? '⏳ Blocage...' : '🔒 Bloquer'}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="panel-actions">
+                <p className="no-permission">🔒 Seuls les managers peuvent bloquer/débloquer les utilisateurs</p>
+              </div>
+            )}
           </div>
         </div>
       )}

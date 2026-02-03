@@ -12,6 +12,12 @@ const Reports = () => {
   const [filterType, setFilterType] = useState('all');
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [photosOpen, setPhotosOpen] = useState(false);
+  const [photos, setPhotos] = useState([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
+  const [photosError, setPhotosError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   // Fetch signalements from API
   useEffect(() => {
@@ -23,17 +29,15 @@ const Reports = () => {
         
         if (data.success && data.signalements) {
           // Transform API data to match table format
-          const formattedReports = data.signalements.map((sig, index) => ({
+          const formattedReports = data.signalements.map((sig) => ({
             id: sig.id,
-            title: sig.title || 'Sans titre',
-            type: sig.type || 'Support',
+            title: sig.descriptiotn || sig.description || 'Sans titre',
+            type: sig.status || 'nouveau',
             severity: sig.severity || 'Medium',
-            status: sig.status === 'pending' ? 'Open' : 
-                   sig.status === 'in_review' ? 'In Review' : 
-                   sig.status === 'resolved' ? 'Resolved' : sig.status || 'Open',
-            reportedBy: sig.reportedBy || 'Anonymous',
-            reportDate: sig.createdAt ? new Date(sig.createdAt).toLocaleDateString('fr-FR') : 'N/A',
-            description: sig.description || ''
+            status: sig.status || 'nouveau',
+            reportedBy: sig.user_id || 'Anonymous',
+            reportDate: sig.date ? new Date(sig.date).toLocaleDateString('fr-FR') : 'N/A',
+            description: sig.descriptiotn || sig.description || ''
           }));
           setReports(formattedReports);
         }
@@ -54,11 +58,11 @@ const Reports = () => {
     fetchSignalements();
   }, []);
 
-  const handleSelectAll = (e) => {
+  const handleSelectAll = (e, pageReports) => {
     if (e.target.checked) {
-      setSelectedRows(reports.map(r => r.id));
+      setSelectedRows(prev => Array.from(new Set([...prev, ...pageReports.map(r => r.id)])));
     } else {
-      setSelectedRows([]);
+      setSelectedRows(prev => prev.filter(id => !pageReports.some(report => report.id === id)));
     }
   };
 
@@ -72,6 +76,36 @@ const Reports = () => {
 
   const handleReportClick = (report) => {
     setSelectedReport(report);
+  };
+
+  const handleViewPhotos = async () => {
+    if (!selectedReport?.id) {
+      return;
+    }
+
+    setPhotosLoading(true);
+    setPhotosError(null);
+    setPhotosOpen(true);
+
+    try {
+      const response = await fetch(`${API_URL}/api/signalements/${selectedReport.id}/photos`);
+      if (!response.ok) {
+        throw new Error('Impossible de charger les photos');
+      }
+      const data = await response.json();
+      const photoNames = Array.isArray(data.photos) ? data.photos : [];
+      const photoItems = photoNames.map((name) => ({
+        name,
+        url: `${API_URL}/uploads/signalements/${selectedReport.id}/${name}`
+      }));
+      setPhotos(photoItems);
+    } catch (err) {
+      console.error('Erreur chargement photos:', err);
+      setPhotos([]);
+      setPhotosError('Aucune photo disponible');
+    } finally {
+      setPhotosLoading(false);
+    }
   };
 
   const getReportTypeColor = (type) => {
@@ -102,6 +136,16 @@ const Reports = () => {
      report.description.toLowerCase().includes(searchTerm.toLowerCase())) &&
     (filterType === 'all' || report.type === filterType)
   );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterType, reports.length]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredReports.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const paginatedReports = filteredReports.slice(startIndex, startIndex + pageSize);
+  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1);
 
   const reportStats = {
     total: reports.length,
@@ -163,13 +207,13 @@ const Reports = () => {
         <div className="filter-section">
           <label className="filter-label">Filter by Type:</label>
           <div className="filter-buttons">
-            {['all', 'Fraud', 'Content', 'Payment', 'Support', 'Bug', 'Security'].map(type => (
+            {['all', 'Nouveau', 'En cours', 'Termine'].map(type => (
               <button
                 key={type}
                 className={`filter-chip ${filterType === type ? 'active' : ''}`}
                 onClick={() => setFilterType(type)}
               >
-                {type === 'all' ? 'All Types' : type}
+                {type === 'all' ? 'Tous' : type}
               </button>
             ))}
           </div>
@@ -189,8 +233,8 @@ const Reports = () => {
                 <th className="checkbox-col">
                   <input
                     type="checkbox"
-                    checked={selectedRows.length === filteredReports.length && filteredReports.length > 0}
-                    onChange={handleSelectAll}
+                    checked={paginatedReports.length > 0 && paginatedReports.every(report => selectedRows.includes(report.id))}
+                    onChange={(e) => handleSelectAll(e, paginatedReports)}
                     className="select-all-checkbox"
                   />
                 </th>
@@ -204,7 +248,7 @@ const Reports = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredReports.map((report) => (
+              {paginatedReports.map((report) => (
                 <tr 
                   key={report.id} 
                   className={`${selectedRows.includes(report.id) ? 'selected' : ''} ${selectedReport?.id === report.id ? 'highlighted' : ''}`}
@@ -249,6 +293,37 @@ const Reports = () => {
           )}
         </div>
 
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="pagination">
+            <button
+              className="pagination-btn"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={safePage === 1}
+            >
+              ← Previous
+            </button>
+            <div className="page-numbers">
+              {pageNumbers.map(page => (
+                <button
+                  key={page}
+                  className={`page-number ${safePage === page ? 'active' : ''}`}
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+            <button
+              className="pagination-btn"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={safePage === totalPages}
+            >
+              Next →
+            </button>
+          </div>
+        )}
+
         {/* Bulk Actions Bar */}
         {selectedRows.length > 0 && (
           <div className="bulk-actions">
@@ -259,18 +334,6 @@ const Reports = () => {
           </div>
         )}
 
-        {/* Pagination */}
-        <div className="pagination">
-          <button className="pagination-btn">← Previous</button>
-          <div className="page-numbers">
-            <button className="page-number active">1</button>
-            <button className="page-number">2</button>
-            <button className="page-number">3</button>
-            <span className="pagination-dots">...</span>
-            <button className="page-number">5</button>
-          </div>
-          <button className="pagination-btn">Next →</button>
-        </div>
       </div>
 
       {/* Report Details Panel */}
@@ -330,6 +393,35 @@ const Reports = () => {
             <div className="panel-actions">
               <button className="btn-primary">Review</button>
               <button className="btn-secondary">Close Report</button>
+              <button className="btn-secondary" onClick={handleViewPhotos}>Voir les photos</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {photosOpen && (
+        <div className="photo-modal-overlay" onClick={() => setPhotosOpen(false)}>
+          <div className="photo-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="photo-modal-header">
+              <h3>Photos du signalement</h3>
+              <button className="close-btn" onClick={() => setPhotosOpen(false)}>✕</button>
+            </div>
+            <div className="photo-modal-content">
+              {photosLoading && <p>Chargement...</p>}
+              {!photosLoading && photosError && <p>{photosError}</p>}
+              {!photosLoading && !photosError && photos.length === 0 && <p>Aucune photo disponible</p>}
+              {!photosLoading && !photosError && photos.length > 0 && (
+                <div className="photo-grid">
+                  {photos.map((photo) => (
+                    <div className="photo-item" key={photo.url}>
+                      <img src={photo.url} alt={photo.name || 'photo'} />
+                      <div className="photo-meta">
+                        <span>{photo.name || 'photo'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
