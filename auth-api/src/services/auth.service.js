@@ -1,4 +1,3 @@
-// src/services/auth.service.js
 const bcrypt = require("bcrypt");
 const { isFirebaseOnline } = require("../utils/connectionUtils");
 const { executeQuery, isPostgreSQLAvailable } = require("../config/postgresql");
@@ -6,6 +5,141 @@ const { syncFirebaseToPostgreSQL } = require("../utils/synchronisationUtils");
 const admin = require("../config/firebase-admin");
 
 class AuthService {
+
+  async incrementLoginAttempts(email) {
+    try {
+      let fbBlocked = false;
+      let blockedUntil = null;
+      try {
+        const user = await admin.auth().getUserByEmail(email);
+        const claims = user.customClaims || {};
+        const maxAttempts = parseInt(process.env.AUTH_MAX_LOGIN_ATTEMPTS || '3', 10);
+        const blockDuration = parseInt(process.env.AUTH_BLOCK_DURATION_MINUTES || '1440', 10);
+        const failedAttempts = (claims.failedAttempts || 0) + 1;
+
+        if (failedAttempts >= maxAttempts) {
+          blockedUntil = new Date(Date.now() + blockDuration * 60 * 1000).toISOString();
+          await admin.auth().setCustomUserClaims(user.uid, { ...claims, failedAttempts, blockedUntil });
+          await admin.auth().updateUser(user.uid, { disabled: true });
+          try {
+            await admin.auth().revokeRefreshTokens(user.uid);
+          } catch (e) {
+            console.warn('Impossible de révoquer refresh tokens:', e.message);
+          }
+          fbBlocked = true;
+        } else {
+          await admin.auth().setCustomUserClaims(user.uid, { ...claims, failedAttempts });
+        }
+      } catch (err) {
+        console.warn('Impossible de mettre à jour les custom claims Firebase:', err.message);
+      }
+
+      try {
+        const pgAvailable = await this.checkPostgreSQLAvailability();
+        if (pgAvailable) {
+          if (blockedUntil) {
+            await executeQuery(
+              `UPDATE users SET failed_attempts = COALESCE(failed_attempts,0) + 1, blocked_until = $1, updated_at = CURRENT_TIMESTAMP WHERE email = $2`,
+              [blockedUntil, email]
+            );
+          } else {
+            await executeQuery(
+              `UPDATE users SET failed_attempts = COALESCE(failed_attempts,0) + 1, updated_at = CURRENT_TIMESTAMP WHERE email = $1`,
+              [email]
+            );
+          }
+        }
+      } catch (err) {
+        console.warn('Impossible de mettre à jour les tentatives dans PostgreSQL:', err.message);
+      }
+
+      try {
+        const attemptsCollection = process.env.AUTH_FIRESTORE_ATTEMPTS_COLLECTION || process.env.AUTH_FIRESTORE_USERS_COLLECTION;
+        if (attemptsCollection) {
+          const db = admin.firestore();
+          const snapshot = await db.collection(attemptsCollection).where('email', '==', email).get();
+          if (snapshot.empty) {
+            await db.collection(attemptsCollection).add({ email, failedAttempts: 1, blockedUntil: blockedUntil || null, updatedAt: new Date().toISOString() }).catch(e => console.warn('Firestore create failed:', e.message));
+          } else {
+            snapshot.forEach(doc => {
+              const data = doc.data() || {};
+              const failedAttempts = (data.failedAttempts || 0) + 1;
+              const updateData = { failedAttempts, updatedAt: new Date().toISOString() };
+              if (blockedUntil) updateData.blockedUntil = blockedUntil;
+              db.collection(attemptsCollection).doc(doc.id).update(updateData).catch(e => console.warn('Firestore update failed:', e.message));
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Impossible de mettre à jour Firestore:', err.message);
+      }
+
+      return { blocked: fbBlocked, blockedUntil };
+    } catch (error) {
+      console.error('Erreur incrementLoginAttempts:', error.message);
+      throw error;
+    }
+  }
+
+  async resetLoginAttempts(email) {
+    try {
+      try {
+        const user = await admin.auth().getUserByEmail(email);
+        const claims = user.customClaims || {};
+        if (claims.failedAttempts || claims.blockedUntil) {
+          const { failedAttempts, blockedUntil, ...rest } = claims;
+          await admin.auth().setCustomUserClaims(user.uid, rest);
+        }
+        if (user.disabled) {
+          try {
+            await admin.auth().updateUser(user.uid, { disabled: false });
+            try {
+              await admin.auth().revokeRefreshTokens(user.uid);
+            } catch(e) {
+              console.warn('Impossible de révoquer refresh tokens lors du déblocage:', e.message);
+            }
+          } catch (e) { /* ignore */ }
+        }
+      } catch (err) {
+        console.warn('Impossible de réinitialiser les custom claims Firebase:', err.message);
+      }
+
+      try {
+        const pgAvailable = await this.checkPostgreSQLAvailability();
+        if (pgAvailable) {
+          await executeQuery(
+            `UPDATE users SET failed_attempts = 0, blocked_until = NULL, updated_at = CURRENT_TIMESTAMP WHERE email = $1`,
+            [email]
+          );
+        }
+      } catch (err) {
+        console.warn('Impossible de réinitialiser les tentatives dans PostgreSQL:', err.message);
+      }
+
+      try {
+        const attemptsCollection = process.env.AUTH_FIRESTORE_ATTEMPTS_COLLECTION || process.env.AUTH_FIRESTORE_USERS_COLLECTION;
+        if (attemptsCollection) {
+          const db = admin.firestore();
+          const snapshot = await db.collection(attemptsCollection).where('email', '==', email).get();
+          if (snapshot.empty) {
+            // create a doc to keep consistency
+            await db.collection(attemptsCollection).add({ email, failedAttempts: 0, blockedUntil: null, updatedAt: new Date().toISOString() }).catch(e => console.warn('Firestore create failed:', e.message));
+          } else {
+            snapshot.forEach(doc => {
+              db.collection(attemptsCollection).doc(doc.id).update({ failedAttempts: 0, blockedUntil: null, updatedAt: new Date().toISOString() }).catch(e => console.warn('Firestore reset failed:', e.message));
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Impossible de réinitialiser Firestore:', err.message);
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Erreur resetLoginAttempts:', error.message);
+      throw error;
+    }
+  }
 
   async checkFirebaseAvailability() {
     try {
@@ -154,7 +288,7 @@ class AuthService {
     }
 
     const result = await executeQuery(
-      "SELECT id, email, password, email_verified, firebase_uid FROM users WHERE email = $1",
+      "SELECT id, email, password, email_verified, firebase_uid, COALESCE(failed_attempts,0) AS failed_attempts, blocked_until FROM users WHERE email = $1",
       [email]
     );
 
@@ -164,9 +298,24 @@ class AuthService {
 
     const user = result.rows[0];
 
+    if (user.blocked_until && new Date(user.blocked_until) > new Date()) {
+      throw new Error(`Compte bloqué jusqu'à ${new Date(user.blocked_until).toISOString()}`);
+    }
+
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
+      try {
+        await this.incrementLoginAttempts(email);
+      } catch (err) {
+        console.warn("Erreur lors de l'incrémentation des tentatives:", err.message);
+      }
       throw new Error("Email ou mot de passe incorrect");
+    }
+
+    try {
+      await this.resetLoginAttempts(email);
+    } catch (err) {
+      console.warn('Impossible de réinitialiser les tentatives après connexion:', err.message);
     }
 
     if (user.firebase_uid) {
@@ -205,7 +354,6 @@ class AuthService {
   async listUsers(maxResults = 1000) {
     const firebaseAvailable = await this.checkFirebaseAvailability();
 
-    // Essayer d'abord Firebase Admin
     if (firebaseAvailable) {
       try {
         const list = await admin.auth().listUsers(maxResults);
@@ -223,7 +371,6 @@ class AuthService {
       }
     }
 
-    // Fallback PostgreSQL
     const pgAvailable = await this.checkPostgreSQLAvailability();
     if (!pgAvailable) {
       throw new Error("Aucun service disponible pour lister les utilisateurs");
@@ -258,7 +405,6 @@ class AuthService {
 
     const blockedUntil = new Date(Date.now() + durationMinutes * 60 * 1000);
 
-    // Bloquer dans Firebase si disponible
     if (firebaseAvailable) {
       try {
         const user = await admin.auth().getUserByEmail(email);
@@ -271,7 +417,6 @@ class AuthService {
       }
     }
 
-    // Bloquer dans PostgreSQL si disponible
     if (pgAvailable) {
       try {
         await executeQuery(
@@ -314,7 +459,6 @@ class AuthService {
       }
     }
 
-    // Débloquer dans PostgreSQL si disponible
     if (pgAvailable) {
       try {
         await executeQuery(
@@ -328,6 +472,13 @@ class AuthService {
         console.error(`Erreur lors du déblocage de ${email}:`, error.message);
         throw new Error("Impossible de débloquer l'utilisateur");
       }
+    }
+
+    try {
+      await this.resetLoginAttempts(email);
+      console.log(`Tentatives pour ${email} réinitialisées`);
+    } catch (err) {
+      console.warn(`Impossible de réinitialiser les tentatives pour ${email}:`, err.message);
     }
 
     return {

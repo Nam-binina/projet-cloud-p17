@@ -37,6 +37,10 @@ services:
       - SERVER_PORT=3000
       - SERVER_HOST=0.0.0.0
       - FIREBASE_SERVICE_ACCOUNT=firebase-service-account.json
+      - NODE_OPTIONS=--dns-result-order=ipv4first
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     depends_on:
       postgres:
         condition: service_healthy

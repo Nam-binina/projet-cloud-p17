@@ -16,7 +16,6 @@ const CustomersTable = ({ userData }) => {
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
-  // Fetch users from API
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -25,7 +24,6 @@ const CustomersTable = ({ userData }) => {
         const data = await response.json();
         
         if (data.success && data.users) {
-          // Transform API data to match table format
           const formattedUsers = data.users.map((user, index) => ({
             id: index + 1,
             uid: user.uid,
@@ -69,7 +67,6 @@ const CustomersTable = ({ userData }) => {
     setSelectedCustomer(customer);
   };
 
-  // Fonction pour recharger les utilisateurs
   const refreshUsers = async () => {
     try {
       setLoading(true);
@@ -89,7 +86,6 @@ const CustomersTable = ({ userData }) => {
         }));
         setCustomers(formattedUsers);
         
-        // Mettre à jour le selectedCustomer si nécessaire
         if (selectedCustomer) {
           const updated = formattedUsers.find(c => c.email === selectedCustomer.email);
           if (updated) setSelectedCustomer(updated);
