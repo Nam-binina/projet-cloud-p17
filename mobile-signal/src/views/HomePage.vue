@@ -189,42 +189,15 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue';
-import {
-  IonPage,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonContent,
-  IonButton,
-  IonButtons,
-  IonItem,
-  IonLabel,
-  IonInput,
-  IonSelect,
-  IonSelectOption,
-  IonIcon,
-  IonSegment,
-  IonSegmentButton,
-  IonModal,
-  IonSpinner
-} from '@ionic/vue';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons, IonItem, IonLabel, IonInput, IonSelect, IonSelectOption, IonIcon, IonSegment, IonSegmentButton, IonModal, IonSpinner } from '@ionic/vue';
 import L from 'leaflet';
 import { Geolocation } from '@capacitor/geolocation';
 import { getFirestore, collection, addDoc, Timestamp, GeoPoint, query, where, getDocs } from 'firebase/firestore';
 import { useCollection, useCurrentUser } from 'vuefire';
 import { getAuth, signOut } from 'firebase/auth';
 import { useFirebaseAuth } from 'vuefire';
-import { 
-  logOutOutline, 
-  eyeOutline, 
-  eyeOffOutline, 
-  refreshOutline, 
-  locateOutline,
-  closeOutline,
-  imagesOutline,
-  imageOutline
-} from 'ionicons/icons';
-import { logOutOutline, eyeOutline, eyeOffOutline, refreshOutline, funnelOutline } from 'ionicons/icons';
+import { locateOutline, closeOutline, imagesOutline, imageOutline } from 'ionicons/icons';
+import { logOutOutline, eyeOutline, eyeOffOutline, refreshOutline } from 'ionicons/icons';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { useRouter } from 'vue-router';
 
@@ -632,9 +605,6 @@ onMounted(() => {
 
 //  Mettre à jour les markers quand les données Firebase changent ou le filtre change
 watch([signalements, filterMode], () => afficherMarkers(), { deep: true });
-watch([signalements, filterMineOnly], () => {
-  if (map) afficherMarkers();
-});
 
 watch(signalements, (newVal) => {
   handleStatusChangeNotifications(newVal || []);
