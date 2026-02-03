@@ -15,6 +15,9 @@ const Map = ({ userData }) => {
   const [loadingSignalements, setLoadingSignalements] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null);
+  const [photosOpen, setPhotosOpen] = useState(false);
+  const [photos, setPhotos] = useState([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
@@ -439,14 +442,14 @@ const Map = ({ userData }) => {
         const color = statusColors[signalement.status] || '#FF6347';
         const marker = L.marker([lat, lng], {
           icon: createCustomIcon(color),
-          title: signalement.description
+          title: signalement.descriptiotn || signalement.description
         }).addTo(map);
 
         markersRef.current.push(marker);
 
         marker.bindPopup(`
           <div class="map-popup">
-            <h4>${signalement.description}</h4>
+            <h4>${signalement.descriptiotn || signalement.description}</h4>
             <div class="popup-grid">
               <div class="popup-item">
                 <span class="popup-label">Date:</span>
@@ -491,6 +494,32 @@ const Map = ({ userData }) => {
     setShowMySignalements(false);
     setMySignalements([]);
     displaySignalements(signalements);
+  };
+
+  // Charger les photos d'un signalement
+  const handleViewPhotos = async () => {
+    if (!selectedSignalement?.id) return;
+    
+    setPhotosLoading(true);
+    setPhotosOpen(true);
+    
+    try {
+      const response = await fetch(`${API_URL}/api/signalements/${selectedSignalement.id}/photos`);
+      if (!response.ok) throw new Error('Impossible de charger les photos');
+      
+      const data = await response.json();
+      const photoNames = Array.isArray(data.photos) ? data.photos : [];
+      const photoItems = photoNames.map((name) => ({
+        name,
+        url: `${API_URL}/uploads/signalements/${selectedSignalement.id}/${name}`
+      }));
+      setPhotos(photoItems);
+    } catch (err) {
+      console.error('Erreur chargement photos:', err);
+      setPhotos([]);
+    } finally {
+      setPhotosLoading(false);
+    }
   };
 
   // Mettre à jour le statut d'un signalement
@@ -620,7 +649,7 @@ const Map = ({ userData }) => {
                 <div className="signalement-info">
                   <div className="info-item">
                     <label>📝 Description</label>
-                    <p>{selectedSignalement.description}</p>
+                    <p>{selectedSignalement.descriptiotn || selectedSignalement.description}</p>
                   </div>
                   <div className="info-item">
                     <label>📅 Date</label>
@@ -629,11 +658,20 @@ const Map = ({ userData }) => {
                   <div className="info-item">
                     <label>📊 Statut actuel</label>
                     <p className={`status-badge status-${selectedSignalement.status}`}>
-                      {selectedSignalement.status === 'en_attente' && '⏳ En attente'}
-                      {selectedSignalement.status === 'planifie' && '📋 Planifié'}
-                      {selectedSignalement.status === 'en_cours' && '🔄 En cours'}
-                      {selectedSignalement.status === 'termine' && '✅ Terminé'}
+                      {selectedSignalement.status === 'Nouveau' && '🆕 Nouveau'}
+                      {selectedSignalement.status === 'En cours' && '🔄 En cours'}
+                      {selectedSignalement.status === 'Termine' && '✅ Terminé'}
+                      {!['Nouveau', 'En cours', 'Termine'].includes(selectedSignalement.status) && selectedSignalement.status}
                     </p>
+                  </div>
+                  <div className="info-item">
+                    <label>📷 Photos</label>
+                    <button 
+                      className="btn-view-photos"
+                      onClick={handleViewPhotos}
+                    >
+                      📸 Voir les photos
+                    </button>
                   </div>
                   <div className="info-item">
                     <label>📐 Surface</label>
@@ -659,30 +697,23 @@ const Map = ({ userData }) => {
                     <label>🔄 Modifier le statut</label>
                     <div className="status-buttons">
                       <button
-                        className={`status-btn en_attente ${selectedSignalement.status === 'en_attente' ? 'active' : ''}`}
-                        onClick={() => updateSignalementStatus(selectedSignalement.id, 'en_attente')}
-                        disabled={updatingStatus || selectedSignalement.status === 'en_attente'}
+                        className={`status-btn nouveau ${selectedSignalement.status === 'Nouveau' ? 'active' : ''}`}
+                        onClick={() => updateSignalementStatus(selectedSignalement.id, 'Nouveau')}
+                        disabled={updatingStatus || selectedSignalement.status === 'Nouveau'}
                       >
-                        ⏳ En attente
+                        🆕 Nouveau
                       </button>
                       <button
-                        className={`status-btn planifie ${selectedSignalement.status === 'planifie' ? 'active' : ''}`}
-                        onClick={() => updateSignalementStatus(selectedSignalement.id, 'planifie')}
-                        disabled={updatingStatus || selectedSignalement.status === 'planifie'}
-                      >
-                        📋 Planifié
-                      </button>
-                      <button
-                        className={`status-btn en_cours ${selectedSignalement.status === 'en_cours' ? 'active' : ''}`}
-                        onClick={() => updateSignalementStatus(selectedSignalement.id, 'en_cours')}
-                        disabled={updatingStatus || selectedSignalement.status === 'en_cours'}
+                        className={`status-btn en_cours ${selectedSignalement.status === 'En cours' ? 'active' : ''}`}
+                        onClick={() => updateSignalementStatus(selectedSignalement.id, 'En cours')}
+                        disabled={updatingStatus || selectedSignalement.status === 'En cours'}
                       >
                         🔄 En cours
                       </button>
                       <button
-                        className={`status-btn termine ${selectedSignalement.status === 'termine' ? 'active' : ''}`}
-                        onClick={() => updateSignalementStatus(selectedSignalement.id, 'termine')}
-                        disabled={updatingStatus || selectedSignalement.status === 'termine'}
+                        className={`status-btn termine ${selectedSignalement.status === 'Termine' ? 'active' : ''}`}
+                        onClick={() => updateSignalementStatus(selectedSignalement.id, 'Termine')}
+                        disabled={updatingStatus || selectedSignalement.status === 'Termine'}
                       >
                         ✅ Terminé
                       </button>
@@ -809,6 +840,34 @@ const Map = ({ userData }) => {
             </div>
           </div>
         </div>
+
+        {/* Photos Modal */}
+        {photosOpen && (
+          <div className="photo-modal-overlay" onClick={() => setPhotosOpen(false)}>
+            <div className="photo-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="photo-modal-header">
+                <h3>📷 Photos du signalement</h3>
+                <button className="close-btn" onClick={() => setPhotosOpen(false)}>✕</button>
+              </div>
+              <div className="photo-modal-content">
+                {photosLoading && <p className="loading-text">⏳ Chargement des photos...</p>}
+                {!photosLoading && photos.length === 0 && <p className="no-photos">Aucune photo disponible</p>}
+                {!photosLoading && photos.length > 0 && (
+                  <div className="photo-grid">
+                    {photos.map((photo) => (
+                      <div className="photo-item" key={photo.url}>
+                        <img src={photo.url} alt={photo.name || 'photo'} />
+                        <div className="photo-meta">
+                          <span>{photo.name || 'photo'}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

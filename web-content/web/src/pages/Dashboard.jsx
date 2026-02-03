@@ -430,10 +430,10 @@ const Dashboard = () => {
                 <h3>Derniers signalements</h3>
                 <div className="activity-list">
                   {recentSignalements.map(item => (
-                    <div className="activity-item" key={item.id || item.date || item.description || item.title}>
+                    <div className="activity-item" key={item.id || item.date || item.descriptiotn || item.description || item.title}>
                       <div className="activity-icon">📝</div>
                       <div className="activity-content">
-                        <p className="activity-title">{item.description || item.title || 'Signalement'}</p>
+                        <p className="activity-title">{item.descriptiotn || item.description || item.title || 'Signalement'}</p>
                         <p className="activity-time">
                           {item.date ? new Date(item.date).toLocaleString('fr-FR') : 'Date inconnue'}
                         </p>

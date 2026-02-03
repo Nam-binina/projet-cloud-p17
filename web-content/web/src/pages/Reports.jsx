@@ -12,7 +12,12 @@ const Reports = () => {
   const [filterType, setFilterType] = useState('all');
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [photosOpen, setPhotosOpen] = useState(false);
+  const [photos, setPhotos] = useState([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
+  const [photosError, setPhotosError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [statusUpdating, setStatusUpdating] = useState(false);
   const pageSize = 10;
 
   // Fetch signalements from API
@@ -27,13 +32,13 @@ const Reports = () => {
           // Transform API data to match table format
           const formattedReports = data.signalements.map((sig) => ({
             id: sig.id,
-            title: sig.description || 'Sans titre',
+            title: sig.descriptiotn || sig.description || 'Sans titre',
             type: sig.status || 'nouveau',
             severity: sig.severity || 'Medium',
             status: sig.status || 'nouveau',
             reportedBy: sig.user_id || 'Anonymous',
             reportDate: sig.date ? new Date(sig.date).toLocaleDateString('fr-FR') : 'N/A',
-            description: sig.description || ''
+            description: sig.descriptiotn || sig.description || ''
           }));
           setReports(formattedReports);
         }
@@ -72,6 +77,67 @@ const Reports = () => {
 
   const handleReportClick = (report) => {
     setSelectedReport(report);
+  };
+
+  const handleStatusChange = async (newStatus) => {
+    if (!selectedReport?.id || statusUpdating) return;
+    
+    setStatusUpdating(true);
+    try {
+      const response = await fetch(`${API_URL}/api/signalements/${selectedReport.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Erreur lors de la mise à jour');
+      }
+      
+      // Update local state
+      setReports(reports.map(r => 
+        r.id === selectedReport.id ? { ...r, status: newStatus, type: newStatus } : r
+      ));
+      setSelectedReport({ ...selectedReport, status: newStatus, type: newStatus });
+      
+    } catch (err) {
+      console.error('Erreur mise à jour statut:', err);
+      alert('Impossible de mettre à jour le statut');
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
+  const handleViewPhotos = async () => {
+    if (!selectedReport?.id) {
+      return;
+    }
+
+    setPhotosLoading(true);
+    setPhotosError(null);
+    setPhotosOpen(true);
+
+    try {
+      const response = await fetch(`${API_URL}/api/signalements/${selectedReport.id}/photos`);
+      if (!response.ok) {
+        throw new Error('Impossible de charger les photos');
+      }
+      const data = await response.json();
+      const photoNames = Array.isArray(data.photos) ? data.photos : [];
+      const photoItems = photoNames.map((name) => ({
+        name,
+        url: `${API_URL}/uploads/signalements/${selectedReport.id}/${name}`
+      }));
+      setPhotos(photoItems);
+    } catch (err) {
+      console.error('Erreur chargement photos:', err);
+      setPhotos([]);
+      setPhotosError('Aucune photo disponible');
+    } finally {
+      setPhotosLoading(false);
+    }
   };
 
   const getReportTypeColor = (type) => {
@@ -173,13 +239,13 @@ const Reports = () => {
         <div className="filter-section">
           <label className="filter-label">Filter by Type:</label>
           <div className="filter-buttons">
-            {['all', 'nouveau', 'en_attente', 'planifie', 'en_cours', 'termine'].map(type => (
+            {['all', 'Nouveau', 'En cours', 'Termine'].map(type => (
               <button
                 key={type}
                 className={`filter-chip ${filterType === type ? 'active' : ''}`}
                 onClick={() => setFilterType(type)}
               >
-                {type === 'all' ? 'All Types' : type}
+                {type === 'all' ? 'Tous' : type}
               </button>
             ))}
           </div>
@@ -300,18 +366,6 @@ const Reports = () => {
           </div>
         )}
 
-        {/* Pagination */}
-        <div className="pagination">
-          <button className="pagination-btn">← Previous</button>
-          <div className="page-numbers">
-            <button className="page-number active">1</button>
-            <button className="page-number">2</button>
-            <button className="page-number">3</button>
-            <span className="pagination-dots">...</span>
-            <button className="page-number">5</button>
-          </div>
-          <button className="pagination-btn">Next →</button>
-        </div>
       </div>
 
       {/* Report Details Panel */}
@@ -342,10 +396,19 @@ const Reports = () => {
             {/* Details */}
             <div className="details-group">
               <div className="detail-item">
-                <label>Type</label>
-                <p style={{ color: getReportTypeColor(selectedReport.type) }}>
-                  {selectedReport.type}
-                </p>
+                <label>Statut</label>
+                <div className="status-selector">
+                  {['Nouveau', 'En cours', 'Termine'].map(status => (
+                    <button
+                      key={status}
+                      className={`status-option ${selectedReport.status === status ? 'active' : ''}`}
+                      onClick={() => handleStatusChange(status)}
+                      disabled={statusUpdating || selectedReport.status === status}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="detail-item">
                 <label>Severity</label>
@@ -371,6 +434,35 @@ const Reports = () => {
             <div className="panel-actions">
               <button className="btn-primary">Review</button>
               <button className="btn-secondary">Close Report</button>
+              <button className="btn-secondary" onClick={handleViewPhotos}>Voir les photos</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {photosOpen && (
+        <div className="photo-modal-overlay" onClick={() => setPhotosOpen(false)}>
+          <div className="photo-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="photo-modal-header">
+              <h3>Photos du signalement</h3>
+              <button className="close-btn" onClick={() => setPhotosOpen(false)}>✕</button>
+            </div>
+            <div className="photo-modal-content">
+              {photosLoading && <p>Chargement...</p>}
+              {!photosLoading && photosError && <p>{photosError}</p>}
+              {!photosLoading && !photosError && photos.length === 0 && <p>Aucune photo disponible</p>}
+              {!photosLoading && !photosError && photos.length > 0 && (
+                <div className="photo-grid">
+                  {photos.map((photo) => (
+                    <div className="photo-item" key={photo.url}>
+                      <img src={photo.url} alt={photo.name || 'photo'} />
+                      <div className="photo-meta">
+                        <span>{photo.name || 'photo'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

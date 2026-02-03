@@ -164,6 +164,58 @@ class SignalementService {
             throw error;
         }
     }
+
+    async uploadSignalementPhotos(id, files = []) {
+        try {
+            if (!id) {
+                throw new Error("ID du signalement requis");
+            }
+
+            const docRef = db.collection("signalements").doc(id);
+            const docSnap = await docRef.get();
+            if (!docSnap.exists) {
+                throw new Error("Signalement introuvable");
+            }
+
+            if (!files.length) {
+                return [];
+            }
+
+            const photoNames = files
+                .map(file => file.filename)
+                .filter(Boolean);
+
+            if (photoNames.length > 0) {
+                await docRef.update({
+                    photos: admin.firestore.FieldValue.arrayUnion(...photoNames)
+                });
+            }
+
+            return photoNames;
+        } catch (error) {
+            console.error("Erreur upload photos signalement :", error.message);
+            throw error;
+        }
+    }
+
+    async listSignalementPhotos(id) {
+        try {
+            if (!id) {
+                throw new Error("ID du signalement requis");
+            }
+
+            const doc = await db.collection("signalements").doc(id).get();
+            if (!doc.exists) {
+                throw new Error("Signalement introuvable");
+            }
+
+            const data = doc.data();
+            return Array.isArray(data.photos) ? data.photos : [];
+        } catch (error) {
+            console.error("Erreur récupération photos signalement :", error.message);
+            throw error;
+        }
+    }
 }
 
 module.exports = new SignalementService();

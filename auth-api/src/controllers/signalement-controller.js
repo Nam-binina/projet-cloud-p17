@@ -50,29 +50,32 @@ class SignalementController {
 
   async create(req, res) {
     try {
-      const { budget, date, description, entreprise, position, status, surface, user_id } = req.body;
+      const { budget, date, description, descriptiotn, entreprise, position, status, surface, user_id } = req.body;
+      const descriptionValue = descriptiotn || description;
 
       // Validation des champs requis
-      if (!budget || !description || !entreprise || !position || !status || !surface || !user_id) {
+      const isMissingNumber = (value) => value === null || value === undefined || Number.isNaN(value);
+      const isMissingString = (value) => !value || String(value).trim().length === 0;
+
+      if (isMissingNumber(budget) || isMissingString(descriptionValue) || isMissingString(entreprise) || !position || isMissingNumber(surface) || isMissingString(user_id)) {
         return res.status(422).json({
           error: "Champs requis manquants",
-          budget: !budget ? "Budget requis" : undefined,
-          description: !description ? "Description requise" : undefined,
-          entreprise: !entreprise ? "Entreprise requise" : undefined,
+          budget: isMissingNumber(budget) ? "Budget requis" : undefined,
+          descriptiotn: isMissingString(descriptionValue) ? "Description requise" : undefined,
+          entreprise: isMissingString(entreprise) ? "Entreprise requise" : undefined,
           position: !position ? "Position requise" : undefined,
-          status: !status ? "Statut requis" : undefined,
-          surface: !surface ? "Surface requise" : undefined,
-          user_id: !user_id ? "User ID requis" : undefined
+          surface: isMissingNumber(surface) ? "Surface requise" : undefined,
+          user_id: isMissingString(user_id) ? "User ID requis" : undefined
         });
       }
 
       const signalement = await signalementService.createSignalement({
         budget,
         date: date || new Date().toISOString(),
-        description,
+        descriptiotn: descriptionValue,
         entreprise,
         position,
-        status,
+        status: status || 'Nouveau',
         surface,
         user_id
       });
@@ -180,6 +183,55 @@ class SignalementController {
       console.error("Erreur cleanup :", error);
       return res.status(500).json({
         error: error.message || "Erreur lors du nettoyage"
+      });
+    }
+  }
+
+  async uploadPhotos(req, res) {
+    try {
+      const { id } = req.params;
+      const files = req.files || [];
+
+      if (!id) {
+        return res.status(422).json({
+          error: "ID du signalement requis"
+        });
+      }
+
+      const photos = await signalementService.uploadSignalementPhotos(id, files);
+
+      return res.status(200).json({
+        success: true,
+        photos
+      });
+    } catch (error) {
+      console.error("Erreur upload photos signalement :", error);
+      return res.status(500).json({
+        error: error.message || "Impossible d'uploader les photos"
+      });
+    }
+  }
+
+  async listPhotos(req, res) {
+    try {
+      const { id } = req.params;
+
+      if (!id) {
+        return res.status(422).json({
+          error: "ID du signalement requis"
+        });
+      }
+
+      const photos = await signalementService.listSignalementPhotos(id);
+
+      return res.status(200).json({
+        success: true,
+        photos
+      });
+    } catch (error) {
+      console.error("Erreur récupération photos signalement :", error);
+      return res.status(500).json({
+        error: error.message || "Impossible de récupérer les photos"
       });
     }
   }

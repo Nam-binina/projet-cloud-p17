@@ -7,7 +7,7 @@ const Login = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [userType, setUserType] = useState('visitor');
+  const [userType, setUserType] = useState('manager');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [connectionStatus, setConnectionStatus] = useState(isOnline() ? 'online' : 'offline');
@@ -223,7 +223,7 @@ const Login = ({ onLogin }) => {
           </form>
 
           {/* User Type Selection */}
-          <div className="user-type-section">
+          {/* <div className="user-type-section">
             <p className="user-type-label">Select User Type</p>
             <div className="user-type-buttons">
               <label className="radio-option">
@@ -257,7 +257,7 @@ const Login = ({ onLogin }) => {
                 <span>Manager</span>
               </label>
             </div>
-          </div>
+          </div> */}
 
           {/* Demo Credentials */}
           <div className="demo-section">
