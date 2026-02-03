@@ -86,9 +86,9 @@
           <ion-item>
             <ion-label>Statut</ion-label>
             <ion-select v-model="form.statut">
-              <ion-select-option value="nouveau">Nouveau</ion-select-option>
-              <ion-select-option value="en_cours">En cours</ion-select-option>
-              <ion-select-option value="termine">Termine</ion-select-option>
+              <ion-select-option value="Nouveau">Nouveau</ion-select-option>
+              <ion-select-option value="En cours">En cours</ion-select-option>
+              <ion-select-option value="Terminé">Terminé</ion-select-option>
             </ion-select>
           </ion-item>
 
@@ -130,7 +130,7 @@
           </div>
           
           <div class="details-content">
-            <p><strong>Statut:</strong> {{ selectedSignalement.status }}</p>
+            <p><strong>Statut:</strong> {{ formatStatusLabel(selectedSignalement.status) }}</p>
             <p><strong>Description:</strong> {{ selectedSignalement.description }}</p>
             <p><strong>Entreprise:</strong> {{ selectedSignalement.entreprise ?? 'N/A' }}</p>
             <p><strong>Surface:</strong> {{ selectedSignalement.surface }} m²</p>
@@ -192,9 +192,9 @@ import { ref, onMounted, computed, watch } from 'vue';
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons, IonItem, IonLabel, IonInput, IonSelect, IonSelectOption, IonIcon, IonSegment, IonSegmentButton, IonModal, IonSpinner } from '@ionic/vue';
 import L from 'leaflet';
 import { Geolocation } from '@capacitor/geolocation';
-import { getFirestore, collection, addDoc, Timestamp, GeoPoint, query, where, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, addDoc } from 'firebase/firestore';
 import { useCollection, useCurrentUser } from 'vuefire';
-import { getAuth, signOut } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { useFirebaseAuth } from 'vuefire';
 import { locateOutline, closeOutline, imagesOutline, imageOutline } from 'ionicons/icons';
 import { logOutOutline, eyeOutline, eyeOffOutline, refreshOutline } from 'ionicons/icons';
@@ -205,7 +205,9 @@ const auth = useFirebaseAuth();
 const router = useRouter();
 const showRecap = ref(true); // Affiche le recap par défaut
 const notificationPermissionGranted = ref(false);
-const lastStatuses = ref<Record<string, string>>({});
+type StatusKey = 'nouveau' | 'en_cours' | 'termine';
+type PhotoItem = { id: string | number; url: string };
+const lastStatuses = ref<Record<string, StatusKey>>({});
 
 /* =========================
     Données
@@ -231,50 +233,29 @@ const filteredSignalements = computed(() => {
     Signalement sélectionné et photos
    ========================= */
 const selectedSignalement = ref<any>(null);
-const signalementPhotos = ref<any[]>([]);
+const signalementPhotos = ref<PhotoItem[]>([]);
 const loadingPhotos = ref(false);
 const showPhotoModal = ref(false);
 const selectedPhoto = ref<any>(null);
 
-// Fonction pour récupérer les photos d'un signalement
-async function fetchPhotosForSignalement(signalementId: string) {
-  loadingPhotos.value = true;
-  signalementPhotos.value = [];
-  
-  try {
-    // Requête pour récupérer les photos liées au signalement
-    const photosQuery = query(
-      collection(db, 'photos'),
-      where('signalement_id', '==', signalementId)
-    );
-    
-    const querySnapshot = await getDocs(photosQuery);
-    
-    signalementPhotos.value = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-  } catch (error) {
-    console.error('Erreur lors de la récupération des photos:', error);
-    signalementPhotos.value = [];
-  } finally {
-    loadingPhotos.value = false;
-  }
-}
-
-// Fonction pour sélectionner un signalement
+// Fonction pour sélectionner un signalement et hydrater les photos
 function selectSignalement(signalement: any) {
   selectedSignalement.value = signalement;
-  // Récupérer les photos associées
-  if (signalement.id) {
-    fetchPhotosForSignalement(signalement.id);
-  }
+  const photos = Array.isArray(signalement?.photos) ? signalement.photos : [];
+  signalementPhotos.value = photos
+    .map((photo: any, index: number) => ({
+      id: photo?.id ?? `${signalement?.id ?? 'photo'}-${index}`,
+      url: typeof photo === 'string' ? photo : photo?.url ?? ''
+    }))
+    .filter((photo: PhotoItem) => photo.url);
+  loadingPhotos.value = false;
 }
 
 // Fonction pour fermer les détails
 function closeDetails() {
   selectedSignalement.value = null;
   signalementPhotos.value = [];
+  loadingPhotos.value = false;
 }
 
 // Fonction pour ouvrir le modal photo
@@ -286,6 +267,15 @@ function openPhotoModal(photo: any) {
 // Fonction pour formater la date
 function formatDate(date: any): string {
   if (!date) return 'N/A';
+  if (typeof date === 'string') {
+    const parsed = new Date(date);
+    if (!isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString('fr-FR');
+    }
+  }
+  if (date instanceof Date) {
+    return date.toLocaleDateString('fr-FR');
+  }
   if (date.toDate) {
     return date.toDate().toLocaleDateString('fr-FR');
   }
@@ -307,7 +297,7 @@ const totalBudget = computed(() =>
 
 const avancement = computed(() => {
   if (filteredSignalements.value.length === 0) return 0;
-  const t = filteredSignalements.value.filter((s: any) => s.status === 'termine').length;
+  const t = filteredSignalements.value.filter((s: any) => normalizeStatus(s.status) === 'termine').length;
   return Math.round((t / filteredSignalements.value.length) * 100);
 });
 
@@ -339,7 +329,7 @@ const showForm = ref(false);
 const positionTemp = ref<{ lat: number; lng: number } | null>(null);
 
 const form = ref({
-  statut: 'nouveau',
+  statut: 'Nouveau',
   description: '',
   entreprise: '',
   surface: 0,
@@ -347,7 +337,7 @@ const form = ref({
 });
 
 //  Icônes personnalisées par statut
-const markerIcons = {
+const markerIcons: Record<StatusKey, L.Icon> = {
   nouveau: L.icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
@@ -374,11 +364,18 @@ const markerIcons = {
   })
 };
 
-const statusLabels: Record<string, string> = {
+const statusLabels: Record<StatusKey, string> = {
   nouveau: 'Nouveau',
   en_cours: 'En cours',
   termine: 'Terminé'
 };
+
+function normalizeStatus(status: unknown): StatusKey {
+  const value = (status ?? '').toString().trim().toLowerCase();
+  if (value.includes('cours')) return 'en_cours';
+  if (value.includes('term')) return 'termine';
+  return 'nouveau';
+}
 
 function activerSignalement() {
   alert('Cliquez sur la carte pour choisir la position');
@@ -394,10 +391,14 @@ async function validerSignalement() {
   try {
     await addDoc(collection(db, 'signalements'), {
       budget: form.value.budget,
-      date: Timestamp.now(),
+      date: new Date().toISOString(),
       description: form.value.description,
-      entreprise: form.value.entreprise || null, // N/A si vide
-      position: new GeoPoint(positionTemp.value.lat, positionTemp.value.lng),
+      entreprise: form.value.entreprise || '',
+      photos: [],
+      position: {
+        latitude: positionTemp.value.lat,
+        longitude: positionTemp.value.lng
+      },
       status: form.value.statut,
       surface: form.value.surface,
       user_id: currentUser.value.uid
@@ -405,7 +406,7 @@ async function validerSignalement() {
 
     // reset
     showForm.value = false;
-    form.value = { statut: 'nouveau', description: '', entreprise: '', surface: 0, budget: 0 };
+    form.value = { statut: 'Nouveau', description: '', entreprise: '', surface: 0, budget: 0 };
     positionTemp.value = null;
 
     if (nouveauMarker) {
@@ -427,19 +428,19 @@ function afficherMarkers() {
   // Ajouter les markers depuis Firebase avec couleur selon status
   if (filteredSignalements.value) {
     filteredSignalements.value.forEach((s: any) => {
-      if (s.position && s.position.latitude && s.position.longitude) {
-        const icon = markerIcons[s.status as keyof typeof markerIcons] || markerIcons.nouveau;
+      if (s.position && typeof s.position.latitude === 'number' && typeof s.position.longitude === 'number') {
+        const icon = markerIcons[normalizeStatus(s.status)] || markerIcons.nouveau;
         const marker = L.marker([s.position.latitude, s.position.longitude], { icon });
         
         // Popup avec infos du signalement et bouton pour voir les détails
         const popupContent = document.createElement('div');
         popupContent.innerHTML = `
-          <b>Statut:</b> ${s.status}<br>
+          <b>Statut:</b> ${formatStatusLabel(s.status)}<br>
           <b>Surface:</b> ${s.surface} m²<br>
           <b>Entreprise:</b> ${s.entreprise ?? 'N/A'}<br>
           <b>Description:</b> ${s.description}<br>
           <b>Budget:</b> ${s.budget} Ar<br>
-          <b>Date:</b> ${s.date?.toDate?.().toLocaleDateString() || 'N/A'}
+          <b>Date:</b> ${formatDate(s.date)}
         `;
         
         const detailsBtn = document.createElement('button');
@@ -481,8 +482,8 @@ async function centrerSurMoi() {
   }
 }
 
-function formatStatusLabel(status: string) {
-  return statusLabels[status as keyof typeof statusLabels] || status;
+function formatStatusLabel(status: unknown) {
+  return statusLabels[normalizeStatus(status)];
 }
 
 async function initLocalNotifications() {
@@ -502,7 +503,7 @@ async function initLocalNotifications() {
 }
 
 async function handleStatusChangeNotifications(newSignalements: any[]) {
-  const updatedStatuses: Record<string, string> = {};
+  const updatedStatuses: Record<string, StatusKey> = {};
   if (!Array.isArray(newSignalements)) {
     lastStatuses.value = updatedStatuses;
     return;
@@ -512,21 +513,21 @@ async function handleStatusChangeNotifications(newSignalements: any[]) {
 
   newSignalements.forEach((signalement: any) => {
     const signalementId = signalement?.id || signalement?.__id || signalement?.docId || signalement?.uid;
-    const currentStatus = signalement?.status;
+    const normalizedStatus = normalizeStatus(signalement?.status);
 
-    if (!signalementId || !currentStatus) return;
+    if (!signalementId) return;
 
-    updatedStatuses[signalementId] = currentStatus;
+    updatedStatuses[signalementId] = normalizedStatus;
 
     if (!currentUser.value || signalement.user_id !== currentUser.value.uid) return;
 
     const previousStatus = lastStatuses.value[signalementId];
-    if (previousStatus && previousStatus !== currentStatus) {
+    if (previousStatus && previousStatus !== normalizedStatus) {
       const label = signalement.description ? `"${signalement.description}"` : 'Un signalement';
       notificationsPayload.push({
         id: Date.now() + notificationsPayload.length,
         title: 'Statut mis à jour',
-        body: `${label} : ${formatStatusLabel(previousStatus)} → ${formatStatusLabel(currentStatus)}`
+        body: `${label} : ${formatStatusLabel(previousStatus)} → ${formatStatusLabel(normalizedStatus)}`
       });
     }
   });
