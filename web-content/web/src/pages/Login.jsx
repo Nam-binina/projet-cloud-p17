@@ -197,6 +197,29 @@ const Login = ({ onLogin }) => {
                 </button>
               </p>
             </div>
+
+            {/* Visitor Access Button */}
+            <div className="visitor-access-section">
+              <div className="divider">
+                <span>ou</span>
+              </div>
+              <button
+                type="button"
+                className="visitor-btn"
+                disabled={loading}
+                onClick={() => {
+                  onLogin({
+                    user: { email: 'visiteur@guest.com', displayName: 'Visiteur' },
+                    userType: 'visitor',
+                    provider: 'guest',
+                    isGuest: true
+                  });
+                }}
+              >
+                <span className="visitor-icon">👤</span>
+                Accéder en tant que visiteur
+              </button>
+            </div>
           </form>
 
           {/* User Type Selection */}
