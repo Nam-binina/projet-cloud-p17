@@ -1,0 +1,152 @@
+:root {
+  --color-primary: #F2A444;
+  --color-dark: #401511;
+  --color-accent: #F27830;
+  --color-light: #BE9086;
+  --color-red: #A62C21;
+  --color-bg-dark: #2a1a15;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  background: linear-gradient(135deg, #f5f1ed 0%, #e8dcd3 100%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  overflow: hidden;
+}
+
+.app-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #f5f1ed 0%, #e8dcd3 100%);
+  position: relative;
+}
+
+.main-content {
+  margin-left: 360px;
+  padding: 0;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: margin-left 0.3s ease;
+  width: calc(100% - 360px);
+  height: 100vh;
+}
+
+.main-content.expanded {
+  margin-left: 140px;
+  width: calc(100% - 140px);
+}
+
+.main-content h1 {
+  color: var(--color-dark);
+  font-size: 32px;
+  margin-bottom: 16px;
+  padding: 40px 40px 0 40px;
+}
+
+.main-content p {
+  color: var(--color-light);
+  font-size: 16px;
+  padding: 0 40px;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .main-content {
+    margin-left: 320px;
+    width: calc(100% - 320px);
+  }
+
+  .main-content.expanded {
+    margin-left: 100px;
+    width: calc(100% - 100px);
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 280px;
+    width: calc(100% - 280px);
+  }
+
+  .main-content.expanded {
+    margin-left: 80px;
+    width: calc(100% - 80px);
+  }
+
+  .main-content h1 {
+    font-size: 24px;
+    padding: 30px 20px 0 20px;
+  }
+
+  .main-content p {
+    font-size: 14px;
+    padding: 0 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-container {
+    flex-direction: column;
+  }
+
+  .main-content {
+    margin-left: 0;
+    margin-top: 80px;
+    width: 100%;
+    height: calc(100vh - 80px);
+  }
+
+  .main-content.expanded {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .main-content h1 {
+    font-size: 20px;
+    padding: 20px 16px 0 16px;
+  }
+
+  .main-content p {
+    font-size: 12px;
+    padding: 0 16px;
+  }
+}
+
+/* Access Denied */
+.access-denied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding: 40px;
+}
+
+.access-denied h2 {
+  font-size: 48px;
+  color: var(--color-red);
+  margin-bottom: 16px;
+}
+
+.access-denied p {
+  font-size: 18px;
+  color: var(--color-dark);
+  margin-bottom: 8px;
+}
+
+.access-denied strong {
+  color: var(--color-primary);
+}
