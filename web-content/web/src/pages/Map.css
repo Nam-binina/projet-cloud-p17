@@ -1020,10 +1020,113 @@
   margin-top: 16px;
 }
 
+/* Photo Modal Styles */
+.photo-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.photo-modal {
+  background: white;
+  border-radius: 12px;
+  max-width: 90%;
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+}
+
+.photo-modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.photo-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--color-dark);
+  font-weight: 600;
+}
+
+.photo-modal-header .close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--color-light);
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.photo-modal-header .close-btn:hover {
+  color: var(--color-dark);
+}
+
+.photo-modal-content {
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.photo-item {
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--color-bg-light);
+  border: 1px solid var(--color-border);
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.photo-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-meta {
+  padding: 8px;
+  background: white;
+  border-top: 1px solid var(--color-border);
+  font-size: 11px;
+  color: var(--color-light);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .signalement-panel {
     width: 100%;
     max-width: 100%;
+  }
+
+  .photo-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
   }
 }

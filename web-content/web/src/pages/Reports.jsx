@@ -17,7 +17,6 @@ const Reports = () => {
   const [photosLoading, setPhotosLoading] = useState(false);
   const [photosError, setPhotosError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [statusUpdating, setStatusUpdating] = useState(false);
   const pageSize = 10;
 
   // Fetch signalements from API
@@ -77,37 +76,6 @@ const Reports = () => {
 
   const handleReportClick = (report) => {
     setSelectedReport(report);
-  };
-
-  const handleStatusChange = async (newStatus) => {
-    if (!selectedReport?.id || statusUpdating) return;
-    
-    setStatusUpdating(true);
-    try {
-      const response = await fetch(`${API_URL}/api/signalements/${selectedReport.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Erreur lors de la mise à jour');
-      }
-      
-      // Update local state
-      setReports(reports.map(r => 
-        r.id === selectedReport.id ? { ...r, status: newStatus, type: newStatus } : r
-      ));
-      setSelectedReport({ ...selectedReport, status: newStatus, type: newStatus });
-      
-    } catch (err) {
-      console.error('Erreur mise à jour statut:', err);
-      alert('Impossible de mettre à jour le statut');
-    } finally {
-      setStatusUpdating(false);
-    }
   };
 
   const handleViewPhotos = async () => {
@@ -396,19 +364,10 @@ const Reports = () => {
             {/* Details */}
             <div className="details-group">
               <div className="detail-item">
-                <label>Statut</label>
-                <div className="status-selector">
-                  {['Nouveau', 'En cours', 'Termine'].map(status => (
-                    <button
-                      key={status}
-                      className={`status-option ${selectedReport.status === status ? 'active' : ''}`}
-                      onClick={() => handleStatusChange(status)}
-                      disabled={statusUpdating || selectedReport.status === status}
-                    >
-                      {status}
-                    </button>
-                  ))}
-                </div>
+                <label>Type</label>
+                <p style={{ color: getReportTypeColor(selectedReport.type) }}>
+                  {selectedReport.type}
+                </p>
               </div>
               <div className="detail-item">
                 <label>Severity</label>

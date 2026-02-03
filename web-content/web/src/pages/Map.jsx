@@ -397,10 +397,9 @@ const Map = ({ userData }) => {
 
     const map = mapInstanceRef.current;
     const statusColors = {
-      'en_attente': '#FFA500',
-      'planifie': '#4169E1',
-      'en_cours': '#32CD32',
-      'termine': '#228B22'
+      'Nouveau': '#FFA500',
+      'En cours': '#32CD32',
+      'Termine': '#228B22'
     };
 
     // Fonction pour créer une icône personnalisée
@@ -496,33 +495,6 @@ const Map = ({ userData }) => {
     displaySignalements(signalements);
   };
 
-  // Charger les photos d'un signalement
-  const handleViewPhotos = async () => {
-    if (!selectedSignalement?.id) return;
-    
-    setPhotosLoading(true);
-    setPhotosOpen(true);
-    
-    try {
-      const response = await fetch(`${API_URL}/api/signalements/${selectedSignalement.id}/photos`);
-      if (!response.ok) throw new Error('Impossible de charger les photos');
-      
-      const data = await response.json();
-      const photoNames = Array.isArray(data.photos) ? data.photos : [];
-      const photoItems = photoNames.map((name) => ({
-        name,
-        url: `${API_URL}/uploads/signalements/${selectedSignalement.id}/${name}`
-      }));
-      setPhotos(photoItems);
-    } catch (err) {
-      console.error('Erreur chargement photos:', err);
-      setPhotos([]);
-    } finally {
-      setPhotosLoading(false);
-    }
-  };
-
-  // Mettre à jour le statut d'un signalement
   const updateSignalementStatus = async (signalementId, newStatus) => {
     try {
       setUpdatingStatus(true);
@@ -556,6 +528,34 @@ const Map = ({ userData }) => {
       setStatusMessage({ type: 'error', text: `❌ Erreur: ${error.message}` });
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const handleViewPhotos = async () => {
+    if (!selectedSignalement?.id) {
+      return;
+    }
+
+    setPhotosLoading(true);
+    setPhotosOpen(true);
+
+    try {
+      const response = await fetch(`${API_URL}/api/signalements/${selectedSignalement.id}/photos`);
+      if (!response.ok) {
+        throw new Error('Impossible de charger les photos');
+      }
+      const data = await response.json();
+      const photoNames = Array.isArray(data.photos) ? data.photos : [];
+      const photoItems = photoNames.map((name) => ({
+        name,
+        url: `${API_URL}/uploads/signalements/${selectedSignalement.id}/${name}`
+      }));
+      setPhotos(photoItems);
+    } catch (err) {
+      console.error('Erreur chargement photos:', err);
+      setPhotos([]);
+    } finally {
+      setPhotosLoading(false);
     }
   };
 
@@ -661,17 +661,7 @@ const Map = ({ userData }) => {
                       {selectedSignalement.status === 'Nouveau' && '🆕 Nouveau'}
                       {selectedSignalement.status === 'En cours' && '🔄 En cours'}
                       {selectedSignalement.status === 'Termine' && '✅ Terminé'}
-                      {!['Nouveau', 'En cours', 'Termine'].includes(selectedSignalement.status) && selectedSignalement.status}
                     </p>
-                  </div>
-                  <div className="info-item">
-                    <label>📷 Photos</label>
-                    <button 
-                      className="btn-view-photos"
-                      onClick={handleViewPhotos}
-                    >
-                      📸 Voir les photos
-                    </button>
                   </div>
                   <div className="info-item">
                     <label>📐 Surface</label>
@@ -697,21 +687,21 @@ const Map = ({ userData }) => {
                     <label>🔄 Modifier le statut</label>
                     <div className="status-buttons">
                       <button
-                        className={`status-btn nouveau ${selectedSignalement.status === 'Nouveau' ? 'active' : ''}`}
+                        className={`status-btn Nouveau ${selectedSignalement.status === 'Nouveau' ? 'active' : ''}`}
                         onClick={() => updateSignalementStatus(selectedSignalement.id, 'Nouveau')}
                         disabled={updatingStatus || selectedSignalement.status === 'Nouveau'}
                       >
                         🆕 Nouveau
                       </button>
                       <button
-                        className={`status-btn en_cours ${selectedSignalement.status === 'En cours' ? 'active' : ''}`}
+                        className={`status-btn En cours ${selectedSignalement.status === 'En cours' ? 'active' : ''}`}
                         onClick={() => updateSignalementStatus(selectedSignalement.id, 'En cours')}
                         disabled={updatingStatus || selectedSignalement.status === 'En cours'}
                       >
                         🔄 En cours
                       </button>
                       <button
-                        className={`status-btn termine ${selectedSignalement.status === 'Termine' ? 'active' : ''}`}
+                        className={`status-btn Termine ${selectedSignalement.status === 'Termine' ? 'active' : ''}`}
                         onClick={() => updateSignalementStatus(selectedSignalement.id, 'Termine')}
                         disabled={updatingStatus || selectedSignalement.status === 'Termine'}
                       >
@@ -727,6 +717,28 @@ const Map = ({ userData }) => {
                     🔒 Connectez-vous pour modifier le statut des signalements
                   </div>
                 )}
+
+                {/* Voir les photos button */}
+                <div className="signalement-actions" style={{ marginTop: '16px' }}>
+                  <button 
+                    className="btn-view-photos"
+                    onClick={handleViewPhotos}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      backgroundColor: '#F2A444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      transition: 'background-color 0.2s ease'
+                    }}
+                  >
+                    📷 Voir les photos
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -823,51 +835,47 @@ const Map = ({ userData }) => {
           <div className="map-legend">
             <h4>Statuts des projets</h4>
             <div className="legend-item">
-              <span className="marker-status" style={{backgroundColor: '#F2A444'}}></span>
+              <span className="marker-status" style={{backgroundColor: '#FFA500'}}></span>
+              <span>Nouveau</span>
+            </div>
+            <div className="legend-item">
+              <span className="marker-status" style={{backgroundColor: '#32CD32'}}></span>
               <span>En cours</span>
             </div>
             <div className="legend-item">
-              <span className="marker-status" style={{backgroundColor: '#401511'}}></span>
-              <span>Planifié</span>
-            </div>
-            <div className="legend-item">
-              <span className="marker-status" style={{backgroundColor: '#4CAF50'}}></span>
-              <span>Complété</span>
-            </div>
-            <div className="legend-item">
-              <span className="marker-status" style={{backgroundColor: '#FF9800'}}></span>
-              <span>En attente</span>
+              <span className="marker-status" style={{backgroundColor: '#228B22'}}></span>
+              <span>Terminé</span>
             </div>
           </div>
-        </div>
 
-        {/* Photos Modal */}
-        {photosOpen && (
-          <div className="photo-modal-overlay" onClick={() => setPhotosOpen(false)}>
-            <div className="photo-modal" onClick={(e) => e.stopPropagation()}>
-              <div className="photo-modal-header">
-                <h3>📷 Photos du signalement</h3>
-                <button className="close-btn" onClick={() => setPhotosOpen(false)}>✕</button>
-              </div>
-              <div className="photo-modal-content">
-                {photosLoading && <p className="loading-text">⏳ Chargement des photos...</p>}
-                {!photosLoading && photos.length === 0 && <p className="no-photos">Aucune photo disponible</p>}
-                {!photosLoading && photos.length > 0 && (
-                  <div className="photo-grid">
-                    {photos.map((photo) => (
-                      <div className="photo-item" key={photo.url}>
-                        <img src={photo.url} alt={photo.name || 'photo'} />
-                        <div className="photo-meta">
-                          <span>{photo.name || 'photo'}</span>
+          {/* Photos Modal */}
+          {photosOpen && (
+            <div className="photo-modal-overlay" onClick={() => setPhotosOpen(false)}>
+              <div className="photo-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="photo-modal-header">
+                  <h3>Photos du signalement</h3>
+                  <button className="close-btn" onClick={() => setPhotosOpen(false)}>✕</button>
+                </div>
+                <div className="photo-modal-content">
+                  {photosLoading && <p>Chargement...</p>}
+                  {!photosLoading && photos.length === 0 && <p>Aucune photo disponible</p>}
+                  {!photosLoading && photos.length > 0 && (
+                    <div className="photo-grid">
+                      {photos.map((photo) => (
+                        <div className="photo-item" key={photo.url}>
+                          <img src={photo.url} alt={photo.name || 'photo'} />
+                          <div className="photo-meta">
+                            <span>{photo.name || 'photo'}</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

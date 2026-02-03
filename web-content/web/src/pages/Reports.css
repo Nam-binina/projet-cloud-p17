@@ -611,42 +611,6 @@
   color: var(--color-light);
 }
 
-/* Status Selector */
-.status-selector {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.status-option {
-  padding: 8px 16px;
-  border: 2px solid var(--color-border);
-  border-radius: 8px;
-  background: white;
-  color: var(--color-dark);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.status-option:hover:not(:disabled) {
-  border-color: var(--color-primary);
-  background: #fff8f0;
-}
-
-.status-option.active {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: white;
-  cursor: default;
-}
-
-.status-option:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 .panel-actions {
   display: flex;
   gap: 10px;
