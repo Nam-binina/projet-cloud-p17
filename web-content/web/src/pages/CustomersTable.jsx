@@ -15,6 +15,8 @@ const CustomersTable = ({ userData }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -47,11 +49,11 @@ const CustomersTable = ({ userData }) => {
     fetchUsers();
   }, []);
 
-  const handleSelectAll = (e) => {
+  const handleSelectAll = (e, pageCustomers) => {
     if (e.target.checked) {
-      setSelectedRows(customers.map(c => c.id));
+      setSelectedRows(prev => Array.from(new Set([...prev, ...pageCustomers.map(c => c.id)])));
     } else {
-      setSelectedRows([]);
+      setSelectedRows(prev => prev.filter(id => !pageCustomers.some(customer => customer.id === id)));
     }
   };
 
@@ -143,6 +145,16 @@ const CustomersTable = ({ userData }) => {
     customer.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, customers.length]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const paginatedCustomers = filteredCustomers.slice(startIndex, startIndex + pageSize);
+  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1);
+
   return (
     <div className="customers-page">
       <div className="customers-container">
@@ -212,8 +224,8 @@ const CustomersTable = ({ userData }) => {
                 <th className="checkbox-col">
                   <input
                     type="checkbox"
-                    checked={selectedRows.length === customers.length && customers.length > 0}
-                    onChange={handleSelectAll}
+                    checked={paginatedCustomers.length > 0 && paginatedCustomers.every(customer => selectedRows.includes(customer.id))}
+                    onChange={(e) => handleSelectAll(e, paginatedCustomers)}
                     className="select-all-checkbox"
                   />
                 </th>
@@ -227,7 +239,7 @@ const CustomersTable = ({ userData }) => {
               </tr>
             </thead>
             <tbody>
-              {filteredCustomers.map((customer) => (
+              {paginatedCustomers.map((customer) => (
                 <tr 
                   key={customer.id} 
                   className={`${selectedRows.includes(customer.id) ? 'selected' : ''} ${selectedCustomer?.id === customer.id ? 'highlighted' : ''}`}
@@ -278,17 +290,35 @@ const CustomersTable = ({ userData }) => {
           )}
 
         {/* Pagination */}
-        <div className="pagination">
-          <button className="pagination-btn">← Previous</button>
-          <div className="page-numbers">
-            <button className="page-number active">1</button>
-            <button className="page-number">2</button>
-            <button className="page-number">3</button>
-            <span className="pagination-dots">...</span>
-            <button className="page-number">10</button>
+        {totalPages > 1 && (
+          <div className="pagination">
+            <button
+              className="pagination-btn"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={safePage === 1}
+            >
+              ← Previous
+            </button>
+            <div className="page-numbers">
+              {pageNumbers.map(page => (
+                <button
+                  key={page}
+                  className={`page-number ${safePage === page ? 'active' : ''}`}
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+            <button
+              className="pagination-btn"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={safePage === totalPages}
+            >
+              Next →
+            </button>
           </div>
-          <button className="pagination-btn">Next →</button>
-        </div>
+        )}
       </div>
 
       {/* Customer Details Panel */}

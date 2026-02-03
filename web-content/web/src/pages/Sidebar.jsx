@@ -9,8 +9,7 @@ const Sidebar = ({ onMenuClick, expanded: propExpanded = true, onToggle, userDat
   const allMenuItems = [
     { name: 'Dashboard', icon: '📊', link: 'dashboard', roles: ['manager'] },
     { name: 'Users', icon: '👥', link: 'customers', roles: ['manager', 'user'] },
-    { name: 'Reports Type', icon: '📋', link: 'reports', roles: ['manager', 'user'] },
-    { name: 'Reports', icon: '📈', link: 'reportsall', roles: ['manager', 'user'] },
+    { name: 'Reports', icon: '📋', link: 'reports', roles: ['manager', 'user'] },
     { name: 'Map', icon: '🗺️', link: 'map', roles: ['manager', 'user', 'visitor'] },
     { name: 'Invoices', icon: '🧾', roles: ['manager', 'user'] },
     { name: 'Wallet', icon: '💰', roles: ['manager', 'user'] },
