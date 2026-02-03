@@ -119,7 +119,70 @@
              Annuler
           </ion-button>
         </div>
+
+        <!-- Panel de détails du signalement sélectionné -->
+        <div class="details-panel" v-if="selectedSignalement">
+          <div class="details-header">
+            <h3>Détails du signalement</h3>
+            <ion-button fill="clear" size="small" @click="closeDetails">
+              <ion-icon :icon="closeOutline"></ion-icon>
+            </ion-button>
+          </div>
+          
+          <div class="details-content">
+            <p><strong>Statut:</strong> {{ selectedSignalement.status }}</p>
+            <p><strong>Description:</strong> {{ selectedSignalement.description }}</p>
+            <p><strong>Entreprise:</strong> {{ selectedSignalement.entreprise ?? 'N/A' }}</p>
+            <p><strong>Surface:</strong> {{ selectedSignalement.surface }} m²</p>
+            <p><strong>Budget:</strong> {{ selectedSignalement.budget }} Ar</p>
+            <p><strong>Date:</strong> {{ formatDate(selectedSignalement.date) }}</p>
+          </div>
+
+          <!-- Section Photos -->
+          <div class="photos-section">
+            <h4>
+              <ion-icon :icon="imagesOutline"></ion-icon>
+              Photos ({{ signalementPhotos.length }})
+            </h4>
+            
+            <div v-if="loadingPhotos" class="loading-photos">
+              <ion-spinner name="crescent"></ion-spinner>
+              <span>Chargement des photos...</span>
+            </div>
+
+            <div v-else-if="signalementPhotos.length === 0" class="no-photos">
+              <ion-icon :icon="imageOutline"></ion-icon>
+              <span>Aucune photo pour ce signalement</span>
+            </div>
+
+            <div v-else class="photos-grid">
+              <div 
+                v-for="(photo, index) in signalementPhotos" 
+                :key="photo.id || index" 
+                class="photo-item"
+                @click="openPhotoModal(photo)"
+              >
+                <img :src="photo.url" :alt="'Photo ' + (index + 1)" />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <!-- Modal pour afficher la photo en grand -->
+      <ion-modal :is-open="showPhotoModal" @didDismiss="showPhotoModal = false">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Photo</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="showPhotoModal = false">Fermer</ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="photo-modal-content">
+          <img v-if="selectedPhoto" :src="selectedPhoto.url" class="full-photo" />
+        </ion-content>
+      </ion-modal>
     </ion-content>
   </ion-page>
 </template>
@@ -141,15 +204,26 @@ import {
   IonSelectOption,
   IonIcon,
   IonSegment,
-  IonSegmentButton
+  IonSegmentButton,
+  IonModal,
+  IonSpinner
 } from '@ionic/vue';
 import L from 'leaflet';
 import { Geolocation } from '@capacitor/geolocation';
-import { getFirestore, collection, addDoc, Timestamp, GeoPoint } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, Timestamp, GeoPoint, query, where, getDocs } from 'firebase/firestore';
 import { useCollection, useCurrentUser } from 'vuefire';
 import { getAuth, signOut } from 'firebase/auth';
 import { useFirebaseAuth } from 'vuefire';
-import { logOutOutline, eyeOutline, eyeOffOutline, refreshOutline, locateOutline } from 'ionicons/icons';
+import { 
+  logOutOutline, 
+  eyeOutline, 
+  eyeOffOutline, 
+  refreshOutline, 
+  locateOutline,
+  closeOutline,
+  imagesOutline,
+  imageOutline
+} from 'ionicons/icons';
 import { useRouter } from 'vue-router';
 
 const auth = useFirebaseAuth();
@@ -175,6 +249,71 @@ const filteredSignalements = computed(() => {
   if (!uid) return [];
   return list.filter((s: any) => s.user_id === uid);
 });
+
+/* =========================
+    Signalement sélectionné et photos
+   ========================= */
+const selectedSignalement = ref<any>(null);
+const signalementPhotos = ref<any[]>([]);
+const loadingPhotos = ref(false);
+const showPhotoModal = ref(false);
+const selectedPhoto = ref<any>(null);
+
+// Fonction pour récupérer les photos d'un signalement
+async function fetchPhotosForSignalement(signalementId: string) {
+  loadingPhotos.value = true;
+  signalementPhotos.value = [];
+  
+  try {
+    // Requête pour récupérer les photos liées au signalement
+    const photosQuery = query(
+      collection(db, 'photos'),
+      where('signalement_id', '==', signalementId)
+    );
+    
+    const querySnapshot = await getDocs(photosQuery);
+    
+    signalementPhotos.value = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('Erreur lors de la récupération des photos:', error);
+    signalementPhotos.value = [];
+  } finally {
+    loadingPhotos.value = false;
+  }
+}
+
+// Fonction pour sélectionner un signalement
+function selectSignalement(signalement: any) {
+  selectedSignalement.value = signalement;
+  // Récupérer les photos associées
+  if (signalement.id) {
+    fetchPhotosForSignalement(signalement.id);
+  }
+}
+
+// Fonction pour fermer les détails
+function closeDetails() {
+  selectedSignalement.value = null;
+  signalementPhotos.value = [];
+}
+
+// Fonction pour ouvrir le modal photo
+function openPhotoModal(photo: any) {
+  selectedPhoto.value = photo;
+  showPhotoModal.value = true;
+}
+
+// Fonction pour formater la date
+function formatDate(date: any): string {
+  if (!date) return 'N/A';
+  if (date.toDate) {
+    return date.toDate().toLocaleDateString('fr-FR');
+  }
+  return 'N/A';
+}
 
 /* =========================
     Récap
@@ -309,15 +448,26 @@ function afficherMarkers() {
         const icon = markerIcons[s.status as keyof typeof markerIcons] || markerIcons.nouveau;
         const marker = L.marker([s.position.latitude, s.position.longitude], { icon });
         
-        // Popup avec infos du signalement
-        marker.bindPopup(`
+        // Popup avec infos du signalement et bouton pour voir les détails
+        const popupContent = document.createElement('div');
+        popupContent.innerHTML = `
           <b>Statut:</b> ${s.status}<br>
           <b>Surface:</b> ${s.surface} m²<br>
           <b>Entreprise:</b> ${s.entreprise ?? 'N/A'}<br>
           <b>Description:</b> ${s.description}<br>
           <b>Budget:</b> ${s.budget} Ar<br>
           <b>Date:</b> ${s.date?.toDate?.().toLocaleDateString() || 'N/A'}
-        `);
+        `;
+        
+        const detailsBtn = document.createElement('button');
+        detailsBtn.textContent = '📷 Voir détails & photos';
+        detailsBtn.style.cssText = 'margin-top: 8px; padding: 6px 12px; background: #3880ff; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;';
+        detailsBtn.addEventListener('click', () => {
+          selectSignalement(s);
+        });
+        
+        popupContent.appendChild(detailsBtn);
+        marker.bindPopup(popupContent);
         
         marker.addTo(map);
       }
@@ -501,6 +651,128 @@ watch([signalements, filterMode], () => afficherMarkers(), { deep: true });
 
 .form ion-button {
   margin-top: 8px;
+}
+
+/* Panel de détails du signalement */
+.details-panel {
+  width: 380px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-left: 1px solid #ddd;
+  padding: 16px;
+  overflow-y: auto;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+}
+
+.details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.details-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.details-content {
+  margin-bottom: 20px;
+}
+
+.details-content p {
+  margin: 8px 0;
+  font-size: 14px;
+  color: #555;
+}
+
+/* Section Photos */
+.photos-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+}
+
+.photos-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.photos-section h4 ion-icon {
+  font-size: 20px;
+  color: #3880ff;
+}
+
+.loading-photos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  color: #666;
+}
+
+.no-photos {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  color: #999;
+  text-align: center;
+}
+
+.no-photos ion-icon {
+  font-size: 48px;
+  margin-bottom: 10px;
+  opacity: 0.5;
+}
+
+.photos-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.photo-item {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid #eee;
+  transition: all 0.2s ease;
+}
+
+.photo-item:hover {
+  border-color: #3880ff;
+  transform: scale(1.02);
+}
+
+.photo-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Modal photo */
+.photo-modal-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+
+.full-photo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 /* Styles pour la légende de la carte */
