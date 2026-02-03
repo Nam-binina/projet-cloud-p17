@@ -69,6 +69,7 @@
 import { ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { useCurrentUser } from 'vuefire';
 import {
   IonPage,
@@ -87,8 +88,11 @@ import {
   alertCircleOutline 
 } from 'ionicons/icons';
 
+const MAX_FAILED_ATTEMPTS = 3;
+
 const router = useRouter();
 const currentUser = useCurrentUser();
+const db = getFirestore();
 
 watch(currentUser, (u) => {
   if (u) router.replace('/home');
@@ -106,17 +110,71 @@ async function onLogin() {
   }
 
   const auth = getAuth();
+  const trimmedEmail = email.value.trim();
+  const attemptsRef = doc(db, 'login_attempts', trimmedEmail.toLowerCase());
+
   errorMessage.value = '';
   isLoading.value = true;
 
+  let attemptData: any = null;
+
   try {
-    await signInWithEmailAndPassword(auth, email.value.trim(), password.value);
+    const attemptsSnap = await getDoc(attemptsRef);
+    attemptData = attemptsSnap.exists() ? attemptsSnap.data() : null;
+
+    if (attemptData?.blockedUntil) {
+      const blockedDate = new Date(attemptData.blockedUntil);
+      if (!Number.isNaN(blockedDate.getTime())) {
+        if (blockedDate > new Date()) {
+          errorMessage.value = `Compte bloqué jusqu'au ${blockedDate.toLocaleString()}.`;
+          return;
+        }
+      } else {
+        errorMessage.value = 'Compte bloqué. Contactez un administrateur pour le débloquer.';
+        return;
+      }
+    }
+
+    await signInWithEmailAndPassword(auth, trimmedEmail, password.value);
+    await resetLoginAttempts(attemptsRef, trimmedEmail);
     router.replace('/home');
   } catch (err: any) {
-    errorMessage.value = "Erreur de connexion.";
+    const blockMessage = await recordFailedAttempt(attemptsRef, attemptData, trimmedEmail);
+    errorMessage.value = blockMessage || 'Email ou mot de passe incorrect.';
   } finally {
     isLoading.value = false;
   }
+}
+
+async function resetLoginAttempts(refDoc: any, emailValue: string) {
+  await setDoc(refDoc, {
+    email: emailValue,
+    failedAttempts: 0,
+    blockedUntil: null,
+    updatedAt: new Date().toISOString()
+  }, { merge: true });
+}
+
+async function recordFailedAttempt(refDoc: any, attemptData: any, emailValue: string) {
+  const previousAttempts = attemptData?.failedAttempts || 0;
+  const newFailedAttempts = previousAttempts + 1;
+  const payload: any = {
+    email: emailValue,
+    failedAttempts: newFailedAttempts,
+    updatedAt: new Date().toISOString()
+  };
+
+  let blockMessage = '';
+
+  if (newFailedAttempts >= MAX_FAILED_ATTEMPTS) {
+    if (!attemptData?.blockedUntil) {
+      payload.blockedUntil = 'manual';
+    }
+    blockMessage = 'Trop de tentatives. Contactez un administrateur pour débloquer votre compte.';
+  }
+
+  await setDoc(refDoc, payload, { merge: true });
+  return blockMessage;
 }
 </script>
 

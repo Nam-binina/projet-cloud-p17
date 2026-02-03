@@ -135,11 +135,14 @@ import { useCollection, useCurrentUser } from 'vuefire';
 import { getAuth, signOut } from 'firebase/auth';
 import { useFirebaseAuth } from 'vuefire';
 import { logOutOutline, eyeOutline, eyeOffOutline, refreshOutline, funnelOutline } from 'ionicons/icons';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { useRouter } from 'vue-router';
 
 const auth = useFirebaseAuth();
 const router = useRouter();
 const showRecap = ref(true); // Affiche le recap par défaut
+const notificationPermissionGranted = ref(false);
+const lastStatuses = ref<Record<string, string>>({});
 
 /* =========================
     Donn�es
@@ -243,6 +246,12 @@ const markerIcons = {
   })
 };
 
+const statusLabels: Record<string, string> = {
+  nouveau: 'Nouveau',
+  en_cours: 'En cours',
+  termine: 'Terminé'
+};
+
 function activerSignalement() {
   alert('Cliquez sur la carte pour choisir la position');
 }
@@ -310,7 +319,76 @@ function afficherMarkers() {
   }
 }
 
+function formatStatusLabel(status: string) {
+  return statusLabels[status as keyof typeof statusLabels] || status;
+}
+
+async function initLocalNotifications() {
+  try {
+    const existingPermission = await LocalNotifications.checkPermissions();
+    if (existingPermission.display === 'granted') {
+      notificationPermissionGranted.value = true;
+      return;
+    }
+
+    const requestedPermission = await LocalNotifications.requestPermissions();
+    notificationPermissionGranted.value = requestedPermission.display === 'granted';
+  } catch (error) {
+    console.warn('Impossible de vérifier les permissions de notification locale:', error);
+    notificationPermissionGranted.value = false;
+  }
+}
+
+async function handleStatusChangeNotifications(newSignalements: any[]) {
+  const updatedStatuses: Record<string, string> = {};
+  if (!Array.isArray(newSignalements)) {
+    lastStatuses.value = updatedStatuses;
+    return;
+  }
+
+  const notificationsPayload: Array<{ id: number; title: string; body: string }> = [];
+
+  newSignalements.forEach((signalement: any) => {
+    const signalementId = signalement?.id || signalement?.__id || signalement?.docId || signalement?.uid;
+    const currentStatus = signalement?.status;
+
+    if (!signalementId || !currentStatus) return;
+
+    updatedStatuses[signalementId] = currentStatus;
+
+    if (!currentUser.value || signalement.user_id !== currentUser.value.uid) return;
+
+    const previousStatus = lastStatuses.value[signalementId];
+    if (previousStatus && previousStatus !== currentStatus) {
+      const label = signalement.description ? `"${signalement.description}"` : 'Un signalement';
+      notificationsPayload.push({
+        id: Date.now() + notificationsPayload.length,
+        title: 'Statut mis à jour',
+        body: `${label} : ${formatStatusLabel(previousStatus)} → ${formatStatusLabel(currentStatus)}`
+      });
+    }
+  });
+
+  lastStatuses.value = updatedStatuses;
+
+  if (!notificationPermissionGranted.value || notificationsPayload.length === 0) return;
+
+  try {
+    await LocalNotifications.schedule({
+      notifications: notificationsPayload.map((notif) => ({
+        id: notif.id,
+        title: notif.title,
+        body: notif.body,
+        schedule: { allowWhileIdle: true }
+      }))
+    });
+  } catch (error) {
+    console.error('Erreur lors de la planification de la notification locale:', error);
+  }
+}
+
 onMounted(() => {
+  initLocalNotifications();
   // Limiter la carte à la région d'Antananarivo
   const anananarivo_bounds = L.latLngBounds(
     [-19.2, 47.3], // Sud-Ouest
@@ -363,6 +441,10 @@ onMounted(() => {
 //  Mettre à jour les markers quand les données Firebase changent ou le filtre change
 watch([signalements, filterMineOnly], () => {
   if (map) afficherMarkers();
+});
+
+watch(signalements, (newVal) => {
+  handleStatusChangeNotifications(newVal || []);
 });
 </script>
 
