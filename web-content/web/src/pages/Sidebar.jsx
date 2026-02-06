@@ -1,23 +1,30 @@
 import { useState } from 'react';
 import './Sidebar.css';
 
+
 const Sidebar = ({ onMenuClick, expanded: propExpanded = true, onToggle, userData, onLogout }) => {
   const userType = userData?.userType || 'visitor';
-  const [activeMenu, setActiveMenu] = useState(userType === 'visitor' ? 'Map' : userType === 'user' ? 'Users' : 'Dashboard');
+  const isGuest = userData?.isGuest || false;
+  const [activeMenu, setActiveMenu] = useState(
+    (userType === 'visitor' || isGuest) ? 'Map' : userType === 'user' ? 'Map' : 'Dashboard'
+  );
 
   // All menu items with role restrictions
   const allMenuItems = [
     { name: 'Dashboard', icon: '📊', link: 'dashboard', roles: ['manager'] },
+    { name: 'Statistics', icon: '📈', link: 'statistics', roles: ['manager', 'user', 'visitor'] },
     { name: 'Users', icon: '👥', link: 'customers', roles: ['manager', 'user'] },
     { name: 'Reports', icon: '📋', link: 'reports', roles: ['manager', 'user'] },
     { name: 'Map', icon: '🗺️', link: 'map', roles: ['manager', 'user', 'visitor'] },
-    { name: 'Invoices', icon: '🧾', roles: ['manager', 'user'] },
-    { name: 'Wallet', icon: '💰', roles: ['manager', 'user'] },
-    { name: 'Notification', icon: '🔔', roles: ['manager', 'user'] },
   ];
 
-  // Filter menu items based on user role
-  const menuItems = allMenuItems.filter(item => item.roles.includes(userType));
+  // Filter menu items based on user role (visitors see Map and Statistics)
+  const menuItems = allMenuItems.filter(item => {
+    if (isGuest || userType === 'visitor') {
+      return item.roles.includes('visitor');
+    }
+    return item.roles.includes(userType);
+  });
 
   const handleMenuClick = (item) => {
     setActiveMenu(item.name);
@@ -37,10 +44,14 @@ const Sidebar = ({ onMenuClick, expanded: propExpanded = true, onToggle, userDat
       {/* Header */}
       <div className="sidebar-header">
         <div className="profile-section">
-          <div className="avatar">👤</div>
+          <div className="avatar">{isGuest ? '👤' : '👨‍💼'}</div>
           <div className="profile-info">
-            <p className="profile-label">{userData?.userType === 'manager' ? 'Manager' : userData?.userType === 'user' ? 'User' : 'Visitor'}</p>
-            <p className="profile-name">{userData?.email || 'User'}</p>
+            <p className="profile-label">
+              {isGuest ? 'Visiteur' : userData?.userType === 'manager' ? 'Manager' : userData?.userType === 'user' ? 'User' : 'Visitor'}
+            </p>
+            <p className="profile-name">
+              {isGuest ? 'Mode Visiteur' : (userData?.user?.email || userData?.email || 'User')}
+            </p>
           </div>
         </div>
         <button 
@@ -90,14 +101,8 @@ const Sidebar = ({ onMenuClick, expanded: propExpanded = true, onToggle, userDat
         ))}
       </div>
 
-      {/* Footer CTA */}
+      {/* Footer */}
       <div className="sidebar-footer">
-        {/* <p className="footer-text">Let's start!</p> */}
-        {/* {propExpanded && <p className="footer-subtext">Creating or adding new tasks couldn't be easier</p>} */}
-        {/* <button className="add-task-btn">
-          <span>+</span> {propExpanded && 'Add New Task'}
-        </button> */}
-        
         {/* Logout Button */}
         <button 
           className="logout-btn"
@@ -112,3 +117,9 @@ const Sidebar = ({ onMenuClick, expanded: propExpanded = true, onToggle, userDat
 };
 
 export default Sidebar;
+
+
+
+
+
+
