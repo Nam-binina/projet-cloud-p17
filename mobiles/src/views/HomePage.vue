@@ -133,7 +133,7 @@ const lastStatuses = ref<Record<string, string>>({});
    ========================= */
 const db = getFirestore();
 const currentUser = useCurrentUser();
-const MAX_PHOTO_SIZE_BYTES = 900 * 1024; // limiter à ~900 KB pour compatibilité avec le backend
+const MAX_PHOTO_SIZE_BYTES = 900 * 1024;
 
 type FilterMode = 'tous' | 'moi';
 const filterMode = ref<FilterMode>('tous');

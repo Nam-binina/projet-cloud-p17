@@ -118,6 +118,21 @@ async function recordFailedAttempt(refDoc: any, attemptData: any, emailValue: st
 }
 </script>
 <style>
+/* Page background and centering */
+.login-content {
+  background: linear-gradient(135deg, #eae366 0%, #e2af2f 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.center-container {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
 .card-header h2 {
   color: #1a1a1a;
   font-weight: 800;
@@ -160,13 +175,13 @@ async function recordFailedAttempt(refDoc: any, attemptData: any, emailValue: st
 
 .cta {
   margin-top: 15px;
-  --background: #e63946; 
-  --color: #ffffff;
+  --background: #FFD700; 
+  --color: #1a1a1a;
   font-weight: 800;
   height: 58px;
   font-size: 16px;
   text-transform: uppercase;
-  box-shadow: 0 8px 15px rgba(230, 57, 70, 0.3);
+  box-shadow: 0 8px 15px rgba(255, 215, 0, 0.24);
 }
 
 .error-box {

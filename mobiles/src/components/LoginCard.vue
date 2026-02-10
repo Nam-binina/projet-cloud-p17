@@ -109,14 +109,14 @@ watch(localPassword, (val) => emit('update:password', val));
 }
 
 .hero {
-  color: #1a1a1a;
+  color: #FFD700;
   text-align: center;
   margin-bottom: 10px;
 }
 
 .main-icon {
   font-size: 75px;
-  color: #1a1a1a;
+  color: #FFD700;
 }
 
 .hero h1 {
@@ -125,19 +125,22 @@ watch(localPassword, (val) => emit('update:password', val));
   letter-spacing: 1.5px;
   margin: 10px 0 5px;
   font-size: 28px;
+  color: #1a1a1a;
 }
 
 .hero p {
   margin: 0;
   font-weight: 600;
-  opacity: 0.8;
+  opacity: 0.85;
   font-size: 14px;
+  color: #555;
 }
 
 .card {
   background: #ffffff;
   border-radius: 24px;
   padding: 30px 25px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.06);
 }
 
 .card-header h2 {
@@ -163,14 +166,17 @@ watch(localPassword, (val) => emit('update:password', val));
 }
 
 .field {
-  border: 1px solid #eee;
+  border: 1px solid #f0e6cc;
   border-radius: 12px;
   --padding-start: 8px;
+  background: #fffdf6;
 }
 
 .cta {
   margin-top: 10px;
-  --background: #1a1a1a;
+  --background: #FFD700;
+  --color: #1a1a1a;
+  box-shadow: 0 8px 15px rgba(255, 215, 0, 0.18);
 }
 
 .error-box {
