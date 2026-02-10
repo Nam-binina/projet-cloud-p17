@@ -117,6 +117,28 @@ function submitPhotos() {
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
 }
 
+@media (max-width: 768px) {
+  .details-panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100% !important;
+    max-height: 55vh;
+    border-left: none;
+    border-top: 2px solid #ddd;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15);
+    z-index: 600;
+    padding: 14px 16px;
+  }
+
+  .photos-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
+  }
+}
+
 .details-header {
   display: flex;
   justify-content: space-between;

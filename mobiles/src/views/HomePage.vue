@@ -50,8 +50,11 @@
           <MapOverlayControls :show-recap="showRecap" @toggle="toggleRecap" />
         </div>
 
-        <div v-if="filterMode === 'moi'" class="list-panel">
-          <div class="list-header">Mes signalements ({{ mySignalements.length }})</div>
+        <div v-if="filterMode === 'moi' && showListPanel" class="list-panel">
+          <div class="list-header">
+            <span>Mes signalements ({{ mySignalements.length }})</span>
+            <button class="list-close-btn" @click="showListPanel = false" title="Fermer">✕</button>
+          </div>
 
           <div v-if="mySignalements.length === 0" class="list-empty">
             Aucun signalement trouve.
@@ -74,8 +77,11 @@
         </div>
 
         <!-- Panel 'Tous' : utilise la même UI que 'Mes signalements' pour cohérence -->
-        <div v-if="filterMode === 'tous'" class="list-panel">
-          <div class="list-header">Tous les signalements ({{ filteredSignalements.length }})</div>
+        <div v-if="filterMode === 'tous' && showListPanel" class="list-panel">
+          <div class="list-header">
+            <span>Tous les signalements ({{ filteredSignalements.length }})</span>
+            <button class="list-close-btn" @click="showListPanel = false" title="Fermer">✕</button>
+          </div>
 
           <div v-if="filteredSignalements.length === 0" class="list-empty">Aucun signalement trouvé.</div>
 
@@ -346,6 +352,7 @@ const mapMarkers = new Map<string, L.Marker>();
 const isLocating = ref(false);
 
 const showForm = ref(false);
+const showListPanel = ref(true);
 const positionTemp = ref<{ lat: number; lng: number } | null>(null);
 
 const form = ref({
@@ -685,6 +692,11 @@ onMounted(() => {
 //  Mettre à jour les markers quand les données Firebase changent ou le filtre change
 watch([signalements, filterMode], () => afficherMarkers(), { deep: true });
 
+// Réouvrir le panel quand on change de filtre
+watch(filterMode, () => {
+  showListPanel.value = true;
+});
+
 watch(signalements, (newVal) => {
   handleStatusChangeNotifications(newVal || []);
 });
@@ -715,15 +727,17 @@ watch(signalements, (newVal) => {
 
 .container {
   display: flex;
-  height: 100%; /* S'assure que le container prend toute la place */
+  height: 100%;
   min-height: 500px;
   width: 100%;
+  position: relative;
 }
 
 .map-container {
   flex: 1;
-  height: 100%; /* Obligatoire pour que la carte remplisse sa zone */
+  height: 100%;
   position: relative;
+  min-width: 0;
 }
 
 #map {
@@ -734,6 +748,7 @@ watch(signalements, (newVal) => {
 
 .list-panel {
   width: 280px;
+  max-width: 85vw;
   flex-shrink: 0;
   background: #ffffff;
   border-left: 1px solid #ddd;
@@ -742,11 +757,60 @@ watch(signalements, (newVal) => {
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.08);
 }
 
+/* ====== RESPONSIVE : mobile / petit écran ====== */
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+    position: relative;
+  }
+
+  .map-container {
+    flex: 1;
+    min-height: 55vh;
+  }
+
+  .list-panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100% !important;
+    max-width: 100%;
+    max-height: 40vh;
+    border-left: none;
+    border-top: 2px solid #ddd;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+    z-index: 500;
+    padding: 10px 14px;
+  }
+}
+
 .list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-weight: 700;
   color: #333;
   margin-bottom: 12px;
   font-size: 14px;
+}
+
+.list-close-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #888;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+
+.list-close-btn:hover {
+  background: #f0f0f0;
+  color: #333;
 }
 
 .list-empty {
