@@ -1,0 +1,268 @@
+{
+	"info": {
+		"_postman_id": "pricing-interventions-collection",
+		"name": "Pricing & Interventions API",
+		"description": "Collection pour tester les APIs Manager : Pricing (prix au m²) et Interventions (CRUD + stats + budget)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Pricing",
+			"description": "Gestion du prix au m² et calcul de budget",
+			"item": [
+				{
+					"name": "1. GET - Prix au m² actuel",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/pricing/price-per-m2",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"pricing",
+								"price-per-m2"
+							]
+						},
+						"description": "Récupère le prix au m² actuel. Si aucune config n'existe, crée une valeur par défaut de 50.00.\n\n**Response:**\n- 200: `{ price_per_m2, updated_at }`\n- 500: Erreur serveur"
+					},
+					"response": []
+				},
+				{
+					"name": "2. PUT - Modifier prix au m²",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"price_per_m2\": 75.00\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/pricing/price-per-m2",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"pricing",
+								"price-per-m2"
+							]
+						},
+						"description": "Modifie le prix au m² (Manager uniquement).\n\n**Body Parameters:**\n- `price_per_m2` (number, required): Nouveau prix au m² (doit être > 0)\n\n**Response:**\n- 200: `{ message, data: { id, price_per_m2, updated_at } }`\n- 400: Prix invalide\n- 500: Erreur serveur"
+					},
+					"response": []
+				},
+				{
+					"name": "3. POST - Calculer budget estimé",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"repair_level\": 5,\n    \"surface_m2\": 120\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/pricing/calculate-budget",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"pricing",
+								"calculate-budget"
+							]
+						},
+						"description": "Calcule un budget estimé selon le niveau de réparation et la surface.\nFormule : price_per_m2 × repair_level × surface_m2\n\n**Body Parameters:**\n- `repair_level` (number, required): Niveau de réparation (1-10)\n- `surface_m2` (number, required): Surface en m² (> 0)\n\n**Response:**\n- 200: `{ price_per_m2, repair_level, surface_m2, calculated_budget, formula }`\n- 400: Paramètres invalides\n- 500: Erreur serveur"
+					},
+					"response": []
+				},
+				{
+					"name": "4. GET - Liste niveaux de réparation",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/pricing/repair-levels",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"pricing",
+								"repair-levels"
+							]
+						},
+						"description": "Retourne la liste des 10 niveaux de réparation avec nom et description.\n\n**Response:**\n- 200: Objet avec clés 1 à 10, chacune contenant `{ name, description }`"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Interventions",
+			"description": "CRUD des interventions avec calcul automatique du budget",
+			"item": [
+				{
+					"name": "1. GET - Liste des interventions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/interventions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"interventions"
+							]
+						},
+						"description": "Récupère toutes les interventions triées par date de création décroissante.\nChaque intervention inclut les infos du niveau de réparation.\n\n**Response:**\n- 200: Array d'interventions\n- 500: Erreur serveur"
+					},
+					"response": []
+				},
+				{
+					"name": "2. GET - Intervention par ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/interventions/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"interventions",
+								"1"
+							]
+						},
+						"description": "Récupère une intervention par son ID.\n\n**Path Parameters:**\n- `id` (number, required): ID de l'intervention\n\n**Response:**\n- 200: Objet intervention\n- 404: Intervention non trouvée\n- 500: Erreur serveur"
+					},
+					"response": []
+				},
+				{
+					"name": "3. POST - Créer une intervention",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Réparation route principale\",\n    \"description\": \"Nids de poule à réparer sur 500m\",\n    \"repair_level\": 6,\n    \"surface_m2\": 250,\n    \"location\": \"Avenue de l'Indépendance, Antananarivo\",\n    \"assigned_to\": \"equipe-a\",\n    \"signalement_id\": null\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/interventions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"interventions"
+							]
+						},
+						"description": "Crée une nouvelle intervention avec calcul automatique du budget.\nLe prix au m² actuel est dénormalisé (stocké dans l'intervention).\n\n**Body Parameters:**\n- `title` (string, required): Titre de l'intervention\n- `description` (string, optional): Description détaillée\n- `repair_level` (number, optional): Niveau de réparation (1-10)\n- `surface_m2` (number, optional): Surface en m²\n- `location` (string, optional): Localisation\n- `assigned_to` (string, optional): Assigné à\n- `signalement_id` (number, optional): ID du signalement lié\n\n**Response:**\n- 201: `{ message, data: intervention }`\n- 400: Paramètres invalides\n- 500: Erreur serveur"
+					},
+					"response": []
+				},
+				{
+					"name": "4. PUT - Modifier une intervention",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Réparation route principale - Mise à jour\",\n    \"repair_level\": 7,\n    \"surface_m2\": 300,\n    \"status\": \"in_progress\",\n    \"assigned_to\": \"equipe-b\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/interventions/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"interventions",
+								"1"
+							]
+						},
+						"description": "Met à jour une intervention existante. Seuls les champs fournis sont modifiés (COALESCE).\nNote : le price_per_m2 n'est PAS modifiable, il reste celui du moment de la création.\n\n**Path Parameters:**\n- `id` (number, required): ID de l'intervention\n\n**Body Parameters (tous optionnels):**\n- `title` (string): Titre\n- `description` (string): Description\n- `repair_level` (number): Niveau de réparation (1-10)\n- `surface_m2` (number): Surface en m²\n- `location` (string): Localisation\n- `status` (string): Statut (pending, in_progress, completed)\n- `assigned_to` (string): Assigné à\n\n**Response:**\n- 200: `{ message, data: intervention }`\n- 400: Paramètres invalides\n- 404: Intervention non trouvée\n- 500: Erreur serveur"
+					},
+					"response": []
+				},
+				{
+					"name": "5. DELETE - Supprimer une intervention",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/interventions/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"interventions",
+								"1"
+							]
+						},
+						"description": "Supprime une intervention par son ID.\n\n**Path Parameters:**\n- `id` (number, required): ID de l'intervention\n\n**Response:**\n- 200: `{ message, data: intervention supprimée }`\n- 404: Intervention non trouvée\n- 500: Erreur serveur"
+					},
+					"response": []
+				},
+				{
+					"name": "6. GET - Statistiques interventions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/interventions/stats/summary",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"interventions",
+								"stats",
+								"summary"
+							]
+						},
+						"description": "Retourne les statistiques des interventions.\n\n**Response:**\n- 200: `{ total_interventions, pending_count, in_progress_count, completed_count, total_budget, average_repair_level, average_surface }`\n- 500: Erreur serveur"
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
