@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import './Map.css';
 import SignalementForm from '../components/SignalementForm';
+import InterventionForm from '../components/InterventionForm';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -18,6 +19,8 @@ const Map = ({ userData }) => {
   const [photosOpen, setPhotosOpen] = useState(false);
   const [photos, setPhotos] = useState([]);
   const [photosLoading, setPhotosLoading] = useState(false);
+  const [showInterventionForm, setShowInterventionForm] = useState(false);
+  const [interventionSignalement, setInterventionSignalement] = useState(null);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
@@ -402,30 +405,58 @@ const Map = ({ userData }) => {
       'Termine': '#228B22'
     };
 
-    // Fonction pour créer une icône personnalisée
-    const createCustomIcon = (color) => {
+    // Niveaux de réparation avec couleurs
+    const repairLevels = {
+      1: { name: 'Très mineur', color: '#4CAF50' },
+      2: { name: 'Mineur', color: '#8BC34A' },
+      3: { name: 'Léger', color: '#CDDC39' },
+      4: { name: 'Modéré-Léger', color: '#FFEB3B' },
+      5: { name: 'Modéré', color: '#FFC107' },
+      6: { name: 'Modéré-Important', color: '#FF9800' },
+      7: { name: 'Important', color: '#FF5722' },
+      8: { name: 'Très important', color: '#F44336' },
+      9: { name: 'Majeur', color: '#E91E63' },
+      10: { name: 'Reconstruction', color: '#9C27B0' }
+    };
+
+    const getRepairLevelColor = (level) => {
+      return repairLevels[level]?.color || '#999';
+    };
+
+    const getRepairLevelName = (level) => {
+      return repairLevels[level]?.name || 'Non défini';
+    };
+
+    // Fonction pour créer une icône personnalisée avec le niveau de réparation
+    const createCustomIcon = (color, repairLevel) => {
+      const levelColor = repairLevel ? getRepairLevelColor(repairLevel) : color;
       return L.divIcon({
         className: 'custom-marker',
         html: `
           <div style="
-            background-color: ${color};
+            background-color: ${levelColor};
             width: 32px;
             height: 32px;
-            border-radius: 50%;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
             border: 3px solid white;
             box-shadow: 0 2px 6px rgba(0,0,0,0.3);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
             cursor: pointer;
           ">
-            📍
+            <span style="
+              transform: rotate(45deg);
+              color: white;
+              font-weight: bold;
+              font-size: 12px;
+            ">${repairLevel || '?'}</span>
           </div>
         `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 32],
-        popupAnchor: [0, -32]
+        iconSize: [32, 42],
+        iconAnchor: [16, 42],
+        popupAnchor: [0, -42]
       });
     };
 
@@ -439,37 +470,58 @@ const Map = ({ userData }) => {
         const lng = parsed.lng;
 
         const color = statusColors[signalement.status] || '#FF6347';
+        const repairLevel = signalement.repair_level || signalement.niveau;
         const marker = L.marker([lat, lng], {
-          icon: createCustomIcon(color),
+          icon: createCustomIcon(color, repairLevel),
           title: signalement.descriptiotn || signalement.description
         }).addTo(map);
 
         markersRef.current.push(marker);
+
+        // Calculer le budget si les données sont disponibles
+        const calculatedBudget = signalement.calculated_budget || 
+          (signalement.budget ? signalement.budget : 
+            (repairLevel && signalement.surface ? repairLevel * signalement.surface * 50 : null));
 
         marker.bindPopup(`
           <div class="map-popup">
             <h4>${signalement.descriptiotn || signalement.description}</h4>
             <div class="popup-grid">
               <div class="popup-item">
-                <span class="popup-label">Date:</span>
+                <span class="popup-label">📅 Date:</span>
                 <span class="popup-value">${new Date(signalement.date).toLocaleDateString('fr-FR')}</span>
               </div>
               <div class="popup-item">
-                <span class="popup-label">Statut:</span>
-                <span class="popup-value" style="color: ${color}">${signalement.status}</span>
+                <span class="popup-label">📊 Statut:</span>
+                <span class="popup-value" style="color: ${color}; font-weight: bold;">${signalement.status}</span>
               </div>
               <div class="popup-item">
-                <span class="popup-label">Surface:</span>
-                <span class="popup-value">${signalement.surface.toLocaleString()} m²</span>
+                <span class="popup-label">🔧 Niveau:</span>
+                <span class="popup-value" style="color: ${getRepairLevelColor(repairLevel)}; font-weight: bold;">
+                  ${repairLevel || 'N/A'} - ${getRepairLevelName(repairLevel)}
+                </span>
               </div>
               <div class="popup-item">
-                <span class="popup-label">Budget:</span>
-                <span class="popup-value">${signalement.budget.toLocaleString()} MGA</span>
+                <span class="popup-label">📐 Surface:</span>
+                <span class="popup-value">${signalement.surface ? signalement.surface.toLocaleString() : 'N/A'} m²</span>
               </div>
               <div class="popup-item">
-                <span class="popup-label">Entreprise:</span>
-                <span class="popup-value">${signalement.entreprise}</span>
+                <span class="popup-label">💰 Budget:</span>
+                <span class="popup-value" style="color: #2e7d32; font-weight: bold;">
+                  ${calculatedBudget ? calculatedBudget.toLocaleString() + ' €' : 'Non calculé'}
+                </span>
               </div>
+              <div class="popup-item">
+                <span class="popup-label">🏢 Entreprise:</span>
+                <span class="popup-value">${signalement.entreprise || 'Non assignée'}</span>
+              </div>
+              ${signalement.photos && signalement.photos.length > 0 ? `
+                <div class="popup-item popup-photos-link">
+                  <a href="#" onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('openPhotos', {detail: '${signalement.id}'}));">
+                    📸 Voir les photos (${signalement.photos.length})
+                  </a>
+                </div>
+              ` : ''}
             </div>
           </div>
         `);
@@ -612,6 +664,19 @@ const Map = ({ userData }) => {
                   ➕ Ajouter un projet
                 </button>
                 <button 
+                  className="btn-create-intervention"
+                  onClick={() => {
+                    setInterventionSignalement({
+                      lat: clickedLocation.lat,
+                      lng: clickedLocation.lng,
+                      description: clickedLocation.name
+                    });
+                    setShowInterventionForm(true);
+                  }}
+                >
+                  🔧 Créer une intervention
+                </button>
+                <button 
                   className="btn-close-quick"
                   onClick={() => setClickedLocation(null)}
                   title="Fermer"
@@ -664,21 +729,81 @@ const Map = ({ userData }) => {
                     </p>
                   </div>
                   <div className="info-item">
+                    <label>� Niveau de réparation</label>
+                    <p className="repair-level-display" style={{
+                      backgroundColor: (() => {
+                        const repairLevels = {
+                          1: '#4CAF50', 2: '#8BC34A', 3: '#CDDC39', 4: '#FFEB3B', 5: '#FFC107',
+                          6: '#FF9800', 7: '#FF5722', 8: '#F44336', 9: '#E91E63', 10: '#9C27B0'
+                        };
+                        return repairLevels[selectedSignalement.repair_level || selectedSignalement.niveau] || '#999';
+                      })(),
+                      color: 'white',
+                      padding: '6px 12px',
+                      borderRadius: '16px',
+                      display: 'inline-block',
+                      fontWeight: 'bold'
+                    }}>
+                      Niveau {selectedSignalement.repair_level || selectedSignalement.niveau || 'N/A'} - {
+                        {
+                          1: 'Très mineur', 2: 'Mineur', 3: 'Léger', 4: 'Modéré-Léger', 5: 'Modéré',
+                          6: 'Modéré-Important', 7: 'Important', 8: 'Très important', 9: 'Majeur', 10: 'Reconstruction'
+                        }[selectedSignalement.repair_level || selectedSignalement.niveau] || 'Non défini'
+                      }
+                    </p>
+                  </div>
+                  <div className="info-item">
                     <label>📐 Surface</label>
                     <p>{selectedSignalement.surface?.toLocaleString() || 'N/A'} m²</p>
                   </div>
                   <div className="info-item">
-                    <label>💰 Budget</label>
-                    <p>{selectedSignalement.budget?.toLocaleString() || 'N/A'} MGA</p>
+                    <label>💰 Budget calculé</label>
+                    <p style={{ color: '#2e7d32', fontWeight: 'bold', fontSize: '1.1em' }}>
+                      {selectedSignalement.calculated_budget 
+                        ? selectedSignalement.calculated_budget.toLocaleString() + ' €'
+                        : selectedSignalement.budget 
+                          ? selectedSignalement.budget.toLocaleString() + ' MGA'
+                          : (selectedSignalement.repair_level && selectedSignalement.surface)
+                            ? ((selectedSignalement.repair_level || 5) * (selectedSignalement.surface || 0) * 50).toLocaleString() + ' €'
+                            : 'Non calculé'
+                      }
+                    </p>
+                    {selectedSignalement.repair_level && selectedSignalement.surface && (
+                      <small style={{ color: '#666', display: 'block', marginTop: '4px' }}>
+                        Formule: 50€/m² × {selectedSignalement.repair_level} × {selectedSignalement.surface}m²
+                      </small>
+                    )}
                   </div>
                   <div className="info-item">
                     <label>🏢 Entreprise</label>
-                    <p>{selectedSignalement.entreprise || 'N/A'}</p>
+                    <p>{selectedSignalement.entreprise || 'Non assignée'}</p>
                   </div>
                   <div className="info-item">
                     <label>📍 Coordonnées</label>
                     <p>{selectedSignalement.lat?.toFixed(4)}, {selectedSignalement.lng?.toFixed(4)}</p>
                   </div>
+                  {/* Lien vers les photos */}
+                  {/* <div className="info-item photos-link-item">
+                    <button 
+                      className="btn-view-photos"
+                      onClick={handleViewPhotos}
+                      style={{
+                        background: '#1976d2',
+                        color: 'white',
+                        border: 'none',
+                        padding: '10px 16px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        width: '100%',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      📸 Voir les photos
+                    </button>
+                  </div> */}
                 </div>
 
                 {/* Modifier le statut - visible pour manager et user */}
@@ -719,7 +844,7 @@ const Map = ({ userData }) => {
                 )}
 
                 {/* Voir les photos button */}
-                <div className="signalement-actions" style={{ marginTop: '16px' }}>
+                <div className="signalement-actions" style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <button 
                     className="btn-view-photos"
                     onClick={handleViewPhotos}
@@ -736,7 +861,16 @@ const Map = ({ userData }) => {
                       transition: 'background-color 0.2s ease'
                     }}
                   >
-                    📷 Voir les photos
+                    Voir les photos
+                  </button>
+                  <button 
+                    className="btn-create-intervention"
+                    onClick={() => {
+                      setInterventionSignalement(selectedSignalement);
+                      setShowInterventionForm(true);
+                    }}
+                  >
+                    Créer une intervention
                   </button>
                 </div>
               </div>
@@ -829,6 +963,22 @@ const Map = ({ userData }) => {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Intervention Form Modal */}
+          {showInterventionForm && (
+            <InterventionForm
+              signalement={interventionSignalement}
+              onClose={() => {
+                setShowInterventionForm(false);
+                setInterventionSignalement(null);
+              }}
+              onCreated={() => {
+                setShowInterventionForm(false);
+                setInterventionSignalement(null);
+                setSelectedSignalement(null);
+              }}
+            />
           )}
 
           {/* Legend */}

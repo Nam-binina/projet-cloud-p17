@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/postgresql');
+const { pool } = require('../config/postgresql');
 
 // GET - Récupérer le prix au m2 actuel
 router.get('/price-per-m2', async (req, res) => {

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/postgresql');
+const { pool } = require('../config/postgresql');
 
 // Niveaux de réparation avec descriptions
 const REPAIR_LEVELS = {
@@ -59,6 +59,8 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST - Créer une intervention avec calcul automatique du budget
+// Le prix au m2 est dénormalisé : on stocke le prix actuel dans l'intervention
+// afin qu'un changement futur du prix n'affecte pas les interventions passées.
 router.post('/', async (req, res) => {
     try {
         const { 
@@ -80,12 +82,18 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: 'Niveau de réparation doit être entre 1 et 10' });
         }
         
+        // Récupérer le prix au m2 actuel pour le stocker dans l'intervention
+        const priceResult = await pool.query(
+            'SELECT price_per_m2 FROM repair_pricing_config LIMIT 1'
+        );
+        const current_price_per_m2 = priceResult.rows[0]?.price_per_m2 || 50.00;
+        
         const result = await pool.query(
             `INSERT INTO interventions 
-             (title, description, repair_level, surface_m2, location, assigned_to, signalement_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             (title, description, repair_level, surface_m2, price_per_m2, location, assigned_to, signalement_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING *`,
-            [title, description, repair_level, surface_m2, location, assigned_to, signalement_id]
+            [title, description, repair_level, surface_m2, current_price_per_m2, location, assigned_to, signalement_id]
         );
         
         const intervention = result.rows[0];
@@ -106,6 +114,8 @@ router.post('/', async (req, res) => {
 });
 
 // PUT - Mettre à jour une intervention
+// Note : le price_per_m2 n'est PAS modifiable ici, il reste celui du moment de la création
+// Le budget est recalculé par le trigger avec le price_per_m2 déjà stocké
 router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;

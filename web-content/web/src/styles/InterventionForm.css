@@ -1,0 +1,343 @@
+/* InterventionForm Modal */
+.intervention-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 20px;
+}
+
+.intervention-modal {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  max-width: 640px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: interventionSlideUp 0.3s ease-out;
+}
+
+@keyframes interventionSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header */
+.intervention-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e8dcd3;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 10;
+  border-radius: 12px 12px 0 0;
+}
+
+.intervention-modal-header h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #401511;
+}
+
+.intervention-modal-header .close-btn {
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  color: #BE9086;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.intervention-modal-header .close-btn:hover {
+  background-color: #f5f1ed;
+  color: #401511;
+}
+
+/* Source info bar */
+.source-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  background: #fef7f0;
+  border-bottom: 1px solid #e8dcd3;
+}
+
+.source-badge {
+  background: #F2A444;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.source-desc {
+  font-size: 13px;
+  color: #666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Messages */
+.intervention-message {
+  margin: 16px 24px 0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.intervention-message.error {
+  background: #fdecea;
+  color: #A62C21;
+  border: 1px solid #f5c6cb;
+}
+
+.intervention-message.success {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+}
+
+/* Form */
+.intervention-form {
+  padding: 24px;
+}
+
+.intervention-form .form-section {
+  margin-bottom: 24px;
+}
+
+.intervention-form .form-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #401511;
+  border-bottom: 2px solid #F2A444;
+  padding-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.intervention-form .form-group {
+  margin-bottom: 16px;
+}
+
+.intervention-form .form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #401511;
+  margin-bottom: 6px;
+}
+
+.intervention-form .form-group input,
+.intervention-form .form-group select,
+.intervention-form .form-group textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e8dcd3;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #333;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.intervention-form .form-group input:focus,
+.intervention-form .form-group select:focus,
+.intervention-form .form-group textarea:focus {
+  outline: none;
+  border-color: #F2A444;
+  box-shadow: 0 0 0 3px rgba(242, 164, 68, 0.15);
+}
+
+.intervention-form .form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.intervention-form .form-hint {
+  display: block;
+  font-size: 12px;
+  color: #BE9086;
+  margin-top: 4px;
+}
+
+.intervention-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Budget estimate */
+.budget-estimate {
+  background: linear-gradient(135deg, #fef7f0, #fff8f2);
+  border: 1px solid #F2A444;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+
+.budget-formula {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.formula-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #BE9086;
+  text-transform: uppercase;
+}
+
+.formula-detail {
+  font-size: 13px;
+  color: #666;
+  font-family: 'Courier New', monospace;
+}
+
+.budget-total {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.budget-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #401511;
+}
+
+.budget-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #2e7d32;
+}
+
+.budget-note {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #BE9086;
+  font-style: italic;
+}
+
+/* Action buttons */
+.intervention-form .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #e8dcd3;
+}
+
+.intervention-form .btn-cancel {
+  padding: 10px 20px;
+  background: white;
+  border: 1px solid #e8dcd3;
+  border-radius: 8px;
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.intervention-form .btn-cancel:hover {
+  background: #f5f1ed;
+  border-color: #BE9086;
+}
+
+.intervention-form .btn-create {
+  padding: 10px 24px;
+  background: #F2A444;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.intervention-form .btn-create:hover {
+  background: #F27830;
+}
+
+.intervention-form .btn-create:disabled {
+  background: #ddd;
+  cursor: not-allowed;
+}
+
+/* Bouton Créer intervention (dans les panels) */
+.btn-create-intervention {
+  width: 100%;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #F2A444, #F27830);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.btn-create-intervention:hover {
+  background: linear-gradient(135deg, #F27830, #A62C21);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(242, 164, 68, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .intervention-form .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .intervention-modal {
+    margin: 10px;
+    max-height: 95vh;
+  }
+
+  .budget-total {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}

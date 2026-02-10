@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from '@ionic/vue-router';
 import HomePage from '@/views/HomePage.vue';
 import LoginPage from '@/views/LoginPage.vue';
+import VisitorMapView from '@/views/VisitorMapView.vue';
 import { getCurrentUser } from 'vuefire';
 
 const routes = [
@@ -15,6 +16,24 @@ const routes = [
   {
     path: '/home',
     component: HomePage
+  },
+  {
+    path: '/visitor',
+    name: 'VisitorMap',
+    component: VisitorMapView,
+    meta: {
+      title: 'Carte des interventions',
+      requiresAuth: false
+    }
+  },
+  {
+    path: '/visitor/map',
+    name: 'VisitorMapAlt',
+    component: VisitorMapView,
+    meta: {
+      title: 'Carte des interventions',
+      requiresAuth: false
+    }
   }
 ];
 
