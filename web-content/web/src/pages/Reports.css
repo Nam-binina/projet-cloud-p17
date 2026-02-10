@@ -350,6 +350,35 @@
   text-align: center;
 }
 
+.action-buttons-group {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+}
+
+.action-btn-icon {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.action-btn-icon:hover {
+  background: var(--color-bg-light);
+  border-color: var(--color-primary);
+  transform: scale(1.1);
+}
+
+.action-btn-icon.intervention:hover {
+  background: rgba(242, 164, 68, 0.1);
+  border-color: var(--color-accent);
+}
+
 .action-btn {
   background: none;
   border: none;

@@ -12,6 +12,7 @@ const Sidebar = ({ onMenuClick, expanded: propExpanded = true, onToggle, userDat
   // All menu items with role restrictions
   const allMenuItems = [
     { name: 'Dashboard', icon: '📊', link: 'dashboard', roles: ['manager'] },
+    { name: 'Réparations', icon: '🔧', link: 'pricing', roles: ['manager'] },
     { name: 'Statistics', icon: '📈', link: 'statistics', roles: ['manager', 'user', 'visitor'] },
     { name: 'Users', icon: '👥', link: 'customers', roles: ['manager', 'user'] },
     { name: 'Reports', icon: '📋', link: 'reports', roles: ['manager', 'user'] },

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import './Reports.css';
+import InterventionForm from '../components/InterventionForm';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -17,6 +18,8 @@ const Reports = () => {
   const [photosLoading, setPhotosLoading] = useState(false);
   const [photosError, setPhotosError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showInterventionForm, setShowInterventionForm] = useState(false);
+  const [interventionReport, setInterventionReport] = useState(null);
   const pageSize = 10;
 
   // Fetch signalements from API
@@ -108,6 +111,34 @@ const Reports = () => {
       if (photoItems.length === 0) {
         setPhotosError('Aucune photo disponible');
       }
+    } catch (err) {
+      console.error('Erreur chargement photos:', err);
+      setPhotos([]);
+      setPhotosError('Aucune photo disponible');
+    } finally {
+      setPhotosLoading(false);
+    }
+  };
+
+  const handleViewPhotosForReport = async (report) => {
+    if (!report?.id) return;
+
+    setPhotosLoading(true);
+    setPhotosError(null);
+    setPhotosOpen(true);
+
+    try {
+      const response = await fetch(`${API_URL}/api/signalements/${report.id}/photos`);
+      if (!response.ok) {
+        throw new Error('Impossible de charger les photos');
+      }
+      const data = await response.json();
+      const photoNames = Array.isArray(data.photos) ? data.photos : [];
+      const photoItems = photoNames.map((name) => ({
+        name,
+        url: `${API_URL}/uploads/signalements/${report.id}/${name}`
+      }));
+      setPhotos(photoItems);
     } catch (err) {
       console.error('Erreur chargement photos:', err);
       setPhotos([]);
@@ -293,7 +324,28 @@ const Reports = () => {
                   <td>{report.reportedBy}</td>
                   <td className="date-cell">{report.reportDate}</td>
                   <td className="action-cell" onClick={(e) => e.stopPropagation()}>
-                    <button className="action-btn">⋮</button>
+                    <div className="action-buttons-group">
+                      <button 
+                        className="action-btn-icon" 
+                        title="Voir les photos"
+                        onClick={() => {
+                          setSelectedReport(report);
+                          handleViewPhotosForReport(report);
+                        }}
+                      >
+                        📷
+                      </button>
+                      <button 
+                        className="action-btn-icon intervention" 
+                        title="Créer une intervention"
+                        onClick={() => {
+                          setInterventionReport(report);
+                          setShowInterventionForm(true);
+                        }}
+                      >
+                        🔧
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -403,6 +455,15 @@ const Reports = () => {
               <button className="btn-primary">Review</button>
               <button className="btn-secondary">Close Report</button>
               <button className="btn-secondary" onClick={handleViewPhotos}>Voir les photos</button>
+              <button 
+                className="btn-create-intervention"
+                onClick={() => {
+                  setInterventionReport(selectedReport);
+                  setShowInterventionForm(true);
+                }}
+              >
+                🔧 Créer une intervention
+              </button>
             </div>
           </div>
         </div>
@@ -434,6 +495,22 @@ const Reports = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Intervention Form Modal */}
+      {showInterventionForm && (
+        <InterventionForm
+          signalement={interventionReport}
+          onClose={() => {
+            setShowInterventionForm(false);
+            setInterventionReport(null);
+          }}
+          onCreated={() => {
+            setShowInterventionForm(false);
+            setInterventionReport(null);
+            setSelectedReport(null);
+          }}
+        />
       )}
     </div>
   );
