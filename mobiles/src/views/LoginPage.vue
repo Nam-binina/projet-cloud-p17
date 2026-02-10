@@ -158,7 +158,6 @@ async function recordFailedAttempt(refDoc: any, attemptData: any, emailValue: st
   color: #1a1a1a;
 }
 
-/* Button CTA - Rouge pour l'action et le rappel du danger */
 .cta {
   margin-top: 15px;
   --background: #e63946; 
@@ -170,7 +169,6 @@ async function recordFailedAttempt(refDoc: any, attemptData: any, emailValue: st
   box-shadow: 0 8px 15px rgba(230, 57, 70, 0.3);
 }
 
-/* Error Message */
 .error-box {
   margin-top: 20px;
   background: #fff5f5;

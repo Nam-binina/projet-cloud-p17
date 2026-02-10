@@ -37,7 +37,10 @@ services:
       - SERVER_PORT=3000
       - SERVER_HOST=0.0.0.0
       - FIREBASE_SERVICE_ACCOUNT=firebase-service-account.json
+      - UPLOAD_DIR=/app/uploads
       - NODE_OPTIONS=--dns-result-order=ipv4first
+    volumes:
+      - auth-uploads:/app/uploads
     dns:
       - 8.8.8.8
       - 1.1.1.1
@@ -98,6 +101,8 @@ services:
 
 volumes:
   postgres-data:
+    driver: local
+  auth-uploads:
     driver: local
   osm-data:
     driver: local

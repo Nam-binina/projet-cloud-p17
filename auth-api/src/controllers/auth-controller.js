@@ -48,7 +48,20 @@ class AuthController {
         res.cookie('access_token', result.idToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
-          maxAge: 24 * 60 * 60 * 1000
+          maxAge: 24 * 60 * 60 * 1000,
+          sameSite: 'Strict',
+          path: '/'
+        });
+      }
+
+      // create and set refresh token cookie if service provided one
+      if (result.refreshToken) {
+        res.cookie('refresh_token', result.refreshToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+          sameSite: 'Strict',
+          path: '/'
         });
       }
 
@@ -69,9 +82,21 @@ class AuthController {
 
   async logoutUser(req, res) {
     try {
+      // revoke session if refresh cookie present
+      const refreshCookie = req.cookies?.refresh_token;
+      if (refreshCookie) {
+        const tokenId = String(refreshCookie).split(':')[0];
+        try {
+          await authService.revokeSessionByTokenId(tokenId);
+        } catch (e) {
+          console.warn('Impossible de révoquer la session:', e.message);
+        }
+      }
+
       const result = await authService.logoutUser();
 
       res.clearCookie('access_token');
+      res.clearCookie('refresh_token');
 
       return res.status(200).json({
         success: true,
@@ -185,15 +210,73 @@ class AuthController {
       });
     }
   }
+
+  async changePassword(req, res) {
+    try {
+      const { id } = req.params;
+      const { old_password, new_password } = req.body;
+
+      if (!id) {
+        return res.status(422).json({
+          error: "ID utilisateur requis"
+        });
+      }
+
+      if (!old_password || !new_password) {
+        return res.status(422).json({
+          error: "Ancien et nouveau mot de passe requis",
+          old_password: !old_password ? "Ancien mot de passe requis" : undefined,
+          new_password: !new_password ? "Nouveau mot de passe requis" : undefined
+        });
+      }
+
+      if (String(new_password).length < 8) {
+        return res.status(422).json({
+          error: "Le nouveau mot de passe doit contenir au moins 8 caracteres",
+          new_password: "Mot de passe trop court"
+        });
+      }
+
+      const result = await authService.changePassword(id, old_password, new_password);
+
+      return res.status(200).json({
+        success: true,
+        message: result.message
+      });
+    } catch (error) {
+      console.error("Erreur lors du changement de mot de passe:", error);
+      return res.status(500).json({
+        error: error.message || "Une erreur est survenue lors du changement de mot de passe"
+      });
+    }
+  }
   async syncDatabases(req, res) {
     try {
+      const syncService = require('../services/sync.service');
       const { syncBidirectional } = require('../utils/synchronisationUtils');
+
+      const processed = await syncService.processQueue(100);
+
       const result = await syncBidirectional();
+
+      const signalementsSync = await syncService.syncSignalementsFromFirebase(200);
+
+      const photoSync = await syncService.syncPhotosFromFirebase(200);
+
+      const photoSyncToFirebase = await syncService.syncPhotosToFirebase(200);
 
       return res.status(200).json({
         success: true,
         message: 'Synchronisation terminée',
-        data: result
+        data: {
+          queue: processed,
+          bidirectional: result,
+          signalements: signalementsSync,
+          photos: {
+            from_firebase: photoSync,
+            to_firebase: photoSyncToFirebase
+          }
+        }
       });
 
     } catch (error) {
@@ -201,6 +284,39 @@ class AuthController {
       return res.status(500).json({
         error: error.message || 'Une erreur est survenue lors de la synchronisation'
       });
+    }
+  }
+
+  async refreshToken(req, res) {
+    try {
+      const raw = req.cookies?.refresh_token;
+      const result = await authService.verifyAndRotateRefreshToken(raw);
+
+      const role = await authService.getUserRoleById(result.userId);
+
+      const jwtSecret = process.env.JWT_SECRET || 'change-this-secret';
+      const token = require('jsonwebtoken').sign({ sub: result.userId, role }, jwtSecret, { expiresIn: '24h' });
+
+      res.cookie('access_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 24 * 60 * 60 * 1000,
+        sameSite: 'Strict',
+        path: '/'
+      });
+
+      res.cookie('refresh_token', result.newRefreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        sameSite: 'Strict',
+        path: '/'
+      });
+
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      console.error('Erreur refresh token:', error);
+      return res.status(401).json({ error: error.message || 'Invalid refresh token' });
     }
   }
 

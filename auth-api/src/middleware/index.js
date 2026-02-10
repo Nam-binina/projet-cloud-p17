@@ -1,17 +1,16 @@
-const { admin } = require("../config/firebase");
+const jwt = require("jsonwebtoken");
 
-
-
-const verifyToken = async (req, res, next) => {
+const verifyToken = (req, res, next) => {
     const idToken = req.cookies.access_token;
     if (!idToken) {
         return res.status(403).json({ error: 'No token provided' });
     }
 
     try {
-      const decodedToken = await admin.auth().verifyIdToken(idToken); 
-        req.user = decodedToken;
-        next();
+      const secret = process.env.JWT_SECRET || 'change-this-secret';
+      const decoded = jwt.verify(idToken, secret);
+      req.user = { uid: decoded.sub, email: decoded.email, role: decoded.role };
+      next();
     } catch (error) {
         console.error('Error verifying token:', error);
         return res.status(403).json({ error: 'Unauthorized' });

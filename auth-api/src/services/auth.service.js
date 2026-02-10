@@ -1,4 +1,5 @@
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 const { isFirebaseOnline } = require("../utils/connectionUtils");
 const { executeQuery, isPostgreSQLAvailable } = require("../config/postgresql");
 const { syncFirebaseToPostgreSQL } = require("../utils/synchronisationUtils");
@@ -122,7 +123,6 @@ class AuthService {
           const db = admin.firestore();
           const snapshot = await db.collection(attemptsCollection).where('email', '==', email).get();
           if (snapshot.empty) {
-            // create a doc to keep consistency
             await db.collection(attemptsCollection).add({ email, failedAttempts: 0, blockedUntil: null, updatedAt: new Date().toISOString() }).catch(e => console.warn('Firestore create failed:', e.message));
           } else {
             snapshot.forEach(doc => {
@@ -161,19 +161,19 @@ class AuthService {
   }
 
   async registerUser(email, password) {
-    const firebaseAvailable = await this.checkFirebaseAvailability();
+    // const firebaseAvailable = await this.checkFirebaseAvailability();
+    console.log("Firebase non disponible, utilisation de PostgreSQL");
+    return await this.registerUserPostgreSQL(email, password);
 
-    if (firebaseAvailable) {
-      try {
-        return await this.registerUserFirebase(email, password);
-      } catch (error) {
-        console.log("Échec Firebase, tentative avec PostgreSQL...");
-        return await this.registerUserPostgreSQL(email, password);
-      }
-    } else {
-      console.log("Firebase non disponible, utilisation de PostgreSQL");
-      return await this.registerUserPostgreSQL(email, password);
-    }
+    // if (firebaseAvailable) {
+    //   try {
+    //     return await this.registerUserFirebase(email, password);
+    //   } catch (error) {
+    //     console.log("Échec Firebase, tentative avec PostgreSQL...");
+    //     return await this.registerUserPostgreSQL(email, password);
+    //   }
+    // } else {
+    // }
   }
 
   async registerUserFirebase(email, password) {
@@ -227,28 +227,39 @@ class AuthService {
       [email, hashedPassword, false]
     );
 
+    const user = result.rows[0];
+
+    // enqueue sync for users
+    try {
+      await executeQuery(`INSERT INTO sync_queue (entity, entity_id, action, payload, status, created_at) VALUES ($1,$2,$3,$4,'PENDING',CURRENT_TIMESTAMP)`, [
+        'users', String(user.id), 'CREATE', JSON.stringify({ email: user.email, email_verified: user.email_verified, role: user.role || 'user' })
+      ]);
+    } catch (e) {
+      console.warn('Failed to enqueue user sync:', e.message);
+    }
+
     return {
       success: true,
       provider: "postgresql",
       message: "Utilisateur créé avec succès sur PostgreSQL",
-      user: result.rows[0]
+      user: user
     };
   }
 
   async loginUser(email, password) {
-    const firebaseAvailable = await this.checkFirebaseAvailability();
+    console.log("Firebase non disponible, utilisation de PostgreSQL");
+    return await this.loginUserPostgreSQL(email, password);
+    // const firebaseAvailable = await this.checkFirebaseAvailability();
 
-    if (firebaseAvailable) {
-      try {
-        return await this.loginUserFirebase(email, password);
-      } catch (error) {
-        console.log("Échec Firebase, tentative avec PostgreSQL...");
-        return await this.loginUserPostgreSQL(email, password);
-      }
-    } else {
-      console.log("Firebase non disponible, utilisation de PostgreSQL");
-      return await this.loginUserPostgreSQL(email, password);
-    }
+    // if (firebaseAvailable) {
+    //   try {
+    //     return await this.loginUserFirebase(email, password);
+    //   } catch (error) {
+    //     console.log("Échec Firebase, tentative avec PostgreSQL...");
+    //     return await this.loginUserPostgreSQL(email, password);
+    //   }
+    // } else {
+    // }
   }
 
   async loginUserFirebase(email, password) {
@@ -288,7 +299,7 @@ class AuthService {
     }
 
     const result = await executeQuery(
-      "SELECT id, email, password, email_verified, firebase_uid, COALESCE(failed_attempts,0) AS failed_attempts, blocked_until FROM users WHERE email = $1",
+      "SELECT id, email, password, email_verified, firebase_uid, role, COALESCE(failed_attempts,0) AS failed_attempts, blocked_until FROM users WHERE email = $1",
       [email]
     );
 
@@ -333,53 +344,40 @@ class AuthService {
       [user.id]
     );
 
-    const token = Buffer.from(`${user.id}:${user.email}:${Date.now()}`).toString('base64');
+    const jwtSecret = process.env.JWT_SECRET || 'change-this-secret';
+    const token = jwt.sign({ sub: user.id, email: user.email, role: user.role || 'user' }, jwtSecret, { expiresIn: '24h' });
+
+    // create refresh token session
+    const refreshToken = await this.createSession(user.id);
 
     return {
       success: true,
       provider: "postgresql",
       message: "Connexion réussie via PostgreSQL",
       idToken: token,
+      refreshToken: refreshToken,
       user: {
         id: user.id,
         email: user.email,
         emailVerified: user.email_verified,
-        firebase_uid: user.firebase_uid
+        firebase_uid: user.firebase_uid,
+        role: user.role || 'user'
       }
-    };
+    }; 
   }
 
 
 
   async listUsers(maxResults = 1000) {
-    const firebaseAvailable = await this.checkFirebaseAvailability();
-
-    if (firebaseAvailable) {
-      try {
-        const list = await admin.auth().listUsers(maxResults);
-        return list.users.map(user => ({
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || null,
-          disabled: user.disabled,
-          provider: 'firebase',
-          lastSignInTime: user.metadata.lastSignInTime,
-          creationTime: user.metadata.creationTime
-        }));
-      } catch (error) {
-        console.log("Échec Firebase Admin, tentative avec PostgreSQL...");
-      }
-    }
-
     const pgAvailable = await this.checkPostgreSQLAvailability();
     if (!pgAvailable) {
       throw new Error("Aucun service disponible pour lister les utilisateurs");
     }
 
     const result = await executeQuery(
-      `SELECT id, email, email_verified, firebase_uid, created_at, last_login
-       FROM users 
-       ORDER BY created_at DESC 
+      `SELECT id, email, email_verified, firebase_uid, created_at, last_login, blocked_until
+       FROM users
+       ORDER BY created_at DESC
        LIMIT $1`,
       [maxResults]
     );
@@ -388,7 +386,7 @@ class AuthService {
       uid: user.firebase_uid || `pg_${user.id}`,
       email: user.email,
       displayName: null,
-      disabled: false,
+      disabled: Boolean(user.blocked_until && new Date(user.blocked_until) > new Date()),
       provider: user.firebase_uid ? 'firebase' : 'postgresql',
       lastSignInTime: user.last_login,
       creationTime: user.created_at
@@ -396,40 +394,24 @@ class AuthService {
   }
 
   async blockUser(email, durationMinutes = 1440) {
-    const firebaseAvailable = await this.checkFirebaseAvailability();
     const pgAvailable = await this.checkPostgreSQLAvailability();
-
-    if (!firebaseAvailable && !pgAvailable) {
+    if (!pgAvailable) {
       throw new Error("Aucun service disponible pour bloquer l'utilisateur");
     }
 
     const blockedUntil = new Date(Date.now() + durationMinutes * 60 * 1000);
 
-    if (firebaseAvailable) {
-      try {
-        const user = await admin.auth().getUserByEmail(email);
-        await admin.auth().updateUser(user.uid, {
-          disabled: true
-        });
-        console.log(`Utilisateur ${email} bloqué dans Firebase`);
-      } catch (error) {
-        console.error(`Erreur lors du blocage Firebase de ${email}:`, error.message);
-      }
-    }
-
-    if (pgAvailable) {
-      try {
-        await executeQuery(
-          `UPDATE users 
-           SET updated_at = CURRENT_TIMESTAMP 
-           WHERE email = $1`,
-          [email]
-        );
-        console.log(`Utilisateur ${email} bloqué`);
-      } catch (error) {
-        console.error(`Erreur lors du blocage de ${email}:`, error.message);
-        throw new Error("Impossible de bloquer l'utilisateur");
-      }
+    try {
+      await executeQuery(
+        `UPDATE users
+         SET blocked_until = $1, failed_attempts = COALESCE(failed_attempts, 0) + 1, updated_at = CURRENT_TIMESTAMP
+         WHERE email = $2`,
+        [blockedUntil, email]
+      );
+      console.log(`Utilisateur ${email} bloqué`);
+    } catch (error) {
+      console.error(`Erreur lors du blocage de ${email}:`, error.message);
+      throw new Error("Impossible de bloquer l'utilisateur");
     }
 
     return {
@@ -439,46 +421,22 @@ class AuthService {
   }
 
   async unblockUser(email) {
-    const firebaseAvailable = await this.checkFirebaseAvailability();
     const pgAvailable = await this.checkPostgreSQLAvailability();
-
-    if (!firebaseAvailable && !pgAvailable) {
+    if (!pgAvailable) {
       throw new Error("Aucun service disponible pour débloquer l'utilisateur");
     }
 
-    // Débloquer dans Firebase si disponible
-    if (firebaseAvailable) {
-      try {
-        const user = await admin.auth().getUserByEmail(email);
-        await admin.auth().updateUser(user.uid, {
-          disabled: false
-        });
-        console.log(`Utilisateur ${email} débloqué dans Firebase`);
-      } catch (error) {
-        console.error(`Erreur lors du déblocage Firebase de ${email}:`, error.message);
-      }
-    }
-
-    if (pgAvailable) {
-      try {
-        await executeQuery(
-          `UPDATE users 
-           SET updated_at = CURRENT_TIMESTAMP 
-           WHERE email = $1`,
-          [email]
-        );
-        console.log(`Utilisateur ${email} débloqué`);
-      } catch (error) {
-        console.error(`Erreur lors du déblocage de ${email}:`, error.message);
-        throw new Error("Impossible de débloquer l'utilisateur");
-      }
-    }
-
     try {
-      await this.resetLoginAttempts(email);
-      console.log(`Tentatives pour ${email} réinitialisées`);
-    } catch (err) {
-      console.warn(`Impossible de réinitialiser les tentatives pour ${email}:`, err.message);
+      await executeQuery(
+        `UPDATE users
+         SET blocked_until = NULL, failed_attempts = 0, updated_at = CURRENT_TIMESTAMP
+         WHERE email = $1`,
+        [email]
+      );
+      console.log(`Utilisateur ${email} débloqué`);
+    } catch (error) {
+      console.error(`Erreur lors du déblocage de ${email}:`, error.message);
+      throw new Error("Impossible de débloquer l'utilisateur");
     }
 
     return {
@@ -487,23 +445,7 @@ class AuthService {
   }
 
   async logoutUser() {
-    const firebaseAvailable = await this.checkFirebaseAvailability();
-
-    if (firebaseAvailable) {
-      try {
-        const { getAuth, signOut } = require("../config/firebase");
-        const auth = getAuth();
-        await signOut(auth);
-        return {
-          success: true,
-          provider: "firebase",
-          message: "Déconnexion réussie"
-        };
-      } catch (error) {
-        console.log("Erreur lors de la déconnexion Firebase:", error.message);
-      }
-    }
-
+    // For PostgreSQL-only mode, logout is client-side cookie clear + optional session revoke.
     return {
       success: true,
       provider: "postgresql",
@@ -511,20 +453,92 @@ class AuthService {
     };
   }
 
-  async resetPassword(email) {
-    const firebaseAvailable = await this.checkFirebaseAvailability();
+  // Sessions / Refresh token management
+  async createSession(userId, ttlDays = 30) {
+    const crypto = require('crypto');
+    const tokenId = crypto.randomBytes(16).toString('hex');
+    const tokenValue = crypto.randomBytes(64).toString('hex');
+    const hashed = await bcrypt.hash(tokenValue, 10);
+    const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
 
-    if (firebaseAvailable) {
-      try {
-        return await this.resetPasswordFirebase(email);
-      } catch (error) {
-        console.log("Échec Firebase, tentative avec PostgreSQL...");
-        return await this.resetPasswordPostgreSQL(email);
-      }
-    } else {
-      console.log("Firebase non disponible, utilisation de PostgreSQL");
-      return await this.resetPasswordPostgreSQL(email);
+    await executeQuery(
+      `INSERT INTO sessions (user_id, token_id, refresh_token_hash, expires_at, created_at)
+       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
+      [userId, tokenId, hashed, expiresAt]
+    );
+
+    return `${tokenId}:${tokenValue}`;
+  }
+
+  async verifyAndRotateRefreshToken(rawToken) {
+    if (!rawToken) throw new Error('Refresh token manquant');
+    const parts = String(rawToken).split(':');
+    if (parts.length !== 2) throw new Error('Refresh token invalide');
+    const [tokenId, tokenValue] = parts;
+
+    const result = await executeQuery(
+      `SELECT id, user_id, refresh_token_hash, expires_at, revoked_at FROM sessions WHERE token_id = $1`,
+      [tokenId]
+    );
+
+    if (result.rows.length === 0) throw new Error('Session introuvable');
+    const session = result.rows[0];
+
+    if (session.revoked_at) throw new Error('Session révoquée');
+    if (new Date(session.expires_at) < new Date()) throw new Error('Refresh token expiré');
+
+    const match = await bcrypt.compare(tokenValue, session.refresh_token_hash);
+    if (!match) {
+      // possible theft - revoke session
+      await executeQuery(`UPDATE sessions SET revoked_at = CURRENT_TIMESTAMP WHERE id = $1`, [session.id]);
+      throw new Error('Refresh token invalide');
     }
+
+    // rotate token value (keep same tokenId)
+    const newTokenValue = require('crypto').randomBytes(64).toString('hex');
+    const newHashed = await bcrypt.hash(newTokenValue, 10);
+    const newExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    await executeQuery(
+      `UPDATE sessions SET refresh_token_hash = $1, expires_at = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+      [newHashed, newExpiresAt, session.id]
+    );
+
+    return { userId: session.user_id, newRefreshToken: `${tokenId}:${newTokenValue}` };
+  }
+
+  async revokeSessionByTokenId(tokenId) {
+    if (!tokenId) return;
+    await executeQuery(`UPDATE sessions SET revoked_at = CURRENT_TIMESTAMP WHERE token_id = $1`, [tokenId]);
+  }
+
+  async revokeAllSessionsForUser(userId) {
+    if (!userId) return;
+    await executeQuery(`UPDATE sessions SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = $1`, [userId]);
+  }
+
+  async getUserRoleById(userId) {
+    const result = await executeQuery("SELECT role FROM users WHERE id = $1", [userId]);
+    if (result.rows.length === 0) {
+      return 'user';
+    }
+    return result.rows[0].role || 'user';
+  }
+
+  async resetPassword(email) {
+    // const firebaseAvailable = await this.checkFirebaseAvailability();
+    console.log("Firebase non disponible, utilisation de PostgreSQL");
+    return await this.resetPasswordPostgreSQL(email);
+
+    // if (firebaseAvailable) {
+    //   try {
+    //     return await this.resetPasswordFirebase(email);
+    //   } catch (error) {
+    //     console.log("Échec Firebase, tentative avec PostgreSQL...");
+    //     return await this.resetPasswordPostgreSQL(email);
+    //   }
+    // } else {
+    // }
   }
 
   async resetPasswordFirebase(email) {
@@ -571,6 +585,41 @@ class AuthService {
       provider: "postgresql",
       message: "Mot de passe réinitialisé via PostgreSQL",
       tempPassword
+    };
+  }
+
+  async changePassword(userId, oldPassword, newPassword) {
+    const pgAvailable = await this.checkPostgreSQLAvailability();
+    if (!pgAvailable) {
+      throw new Error("Aucun service d'authentification disponible");
+    }
+
+    const result = await executeQuery(
+      "SELECT id, password FROM users WHERE id = $1",
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error("Utilisateur introuvable");
+    }
+
+    const user = result.rows[0];
+    const passwordMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!passwordMatch) {
+      throw new Error("Ancien mot de passe incorrect");
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await executeQuery(
+      "UPDATE users SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+      [hashedPassword, user.id]
+    );
+
+    return {
+      success: true,
+      provider: "postgresql",
+      message: "Mot de passe modifie avec succes"
     };
   }
 
