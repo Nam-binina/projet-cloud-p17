@@ -33,173 +33,67 @@
     </ion-header>
 
     <ion-content>
-      <!--  Récap -->
-      <div class="recap" v-if="showRecap">
-        <p><strong>Total :</strong> {{ totalSignalements }}</p>
-        <p><strong>Surface :</strong> {{ totalSurface }} m²</p>
-        <p><strong>Budget :</strong> {{ totalBudget }} Ar</p>
-        <p><strong>Avancement :</strong> {{ avancement }} %</p>
-
-        <ion-button expand="block" color="primary" @click="activerSignalement">
-           Signaler
-        </ion-button>
-
-        <ion-button expand="block" color="light" @click="showRecap = !showRecap" title="Masquer récapitulatif" class="hide-recap-btn">
-          <ion-icon slot="start" :icon="eyeOffOutline"></ion-icon>
-          <span>Masquer recap</span>
-        </ion-button>
-      </div>
+      <RecapPanel
+        :show-recap="showRecap"
+        :total-signalements="totalSignalements"
+        :total-surface="totalSurface"
+        :total-budget="totalBudget"
+        :avancement="avancement"
+        @signaler="activerSignalement"
+        @toggle="toggleRecap"
+      />
 
       <!-- Main container: Carte + Formulaire side-by-side -->
       <div class="container">
         <!--  Carte -->
         <div id="map" class="map-container">
-          <!-- Légende visible par défaut -->
-          <div class="map-legend-overlay">
-            <div class="legend-content">
-              <p class="legend-title">Légende des statuts</p>
-              <div class="legend-item">
-                <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png" alt="Nouveau" class="legend-icon">
-                <span>Nouveau</span>
-              </div>
-              <div class="legend-item">
-                <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png" alt="En cours" class="legend-icon">
-                <span>En cours</span>
-              </div>
-              <div class="legend-item">
-                <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png" alt="Terminé" class="legend-icon">
-                <span>Terminé</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Bouton Voir recap en bas à gauche -->
-          <button class="see-recap-btn" @click="showRecap = !showRecap" :title="showRecap ? 'Masquer récapitulatif' : 'Afficher récapitulatif'">
-            <ion-icon :icon="showRecap ? eyeOffOutline : eyeOutline"></ion-icon>
-            <span>{{ showRecap ? 'Masquer recap' : 'Voir recap' }}</span>
-          </button>
+          <MapOverlayControls :show-recap="showRecap" @toggle="toggleRecap" />
         </div>
 
         <!--  Formulaire à droite -->
-        <div class="form" v-if="showForm">
-          <h3>Nouveau signalement</h3>
-          <ion-item>
-            <ion-label>Statut</ion-label>
-            <ion-select v-model="form.statut">
-              <ion-select-option value="nouveau">Nouveau</ion-select-option>
-              <ion-select-option value="en_cours">En cours</ion-select-option>
-              <ion-select-option value="termine">Termine</ion-select-option>
-            </ion-select>
-          </ion-item>
-
-          <ion-item>
-            <ion-label position="floating">Description</ion-label>
-            <ion-input v-model="form.description" placeholder="Decrivez le probleme"></ion-input>
-          </ion-item>
-
-          <ion-item>
-            <ion-label position="floating">Entreprise concernée</ion-label>
-            <ion-input v-model="form.entreprise" placeholder="Nom de l'entreprise"></ion-input>
-          </ion-item>
-
-          <ion-item>
-            <ion-label position="floating">Surface (m²)</ion-label>
-            <ion-input type="number" v-model.number="form.surface"></ion-input>
-          </ion-item>
-
-          <ion-item>
-            <ion-label position="floating">Budget (Ar)</ion-label>
-            <ion-input type="number" v-model.number="form.budget"></ion-input>
-          </ion-item>
-
-          <ion-button expand="block" color="success" @click="validerSignalement">
-             Valider
-          </ion-button>
-          <ion-button expand="block" color="medium" @click="showForm = false">
-             Annuler
-          </ion-button>
-        </div>
+        <SignalementFormPanel
+          :show="showForm"
+          :form="form"
+          @update:form="updateForm"
+          @update:photos="selectedFiles = $event"
+          @submit="validerSignalement"
+          @cancel="showForm = false"
+        />
 
         <!-- Panel de détails du signalement sélectionné -->
-        <div class="details-panel" v-if="selectedSignalement">
-          <div class="details-header">
-            <h3>Détails du signalement</h3>
-            <ion-button fill="clear" size="small" @click="closeDetails">
-              <ion-icon :icon="closeOutline"></ion-icon>
-            </ion-button>
-          </div>
-          
-          <div class="details-content">
-            <p><strong>Statut:</strong> {{ selectedSignalement.status }}</p>
-            <p><strong>Description:</strong> {{ selectedSignalement.description }}</p>
-            <p><strong>Entreprise:</strong> {{ selectedSignalement.entreprise ?? 'N/A' }}</p>
-            <p><strong>Surface:</strong> {{ selectedSignalement.surface }} m²</p>
-            <p><strong>Budget:</strong> {{ selectedSignalement.budget }} Ar</p>
-            <p><strong>Date:</strong> {{ formatDate(selectedSignalement.date) }}</p>
-          </div>
-
-          <!-- Section Photos -->
-          <div class="photos-section">
-            <h4>
-              <ion-icon :icon="imagesOutline"></ion-icon>
-              Photos ({{ signalementPhotos.length }})
-            </h4>
-            
-            <div v-if="loadingPhotos" class="loading-photos">
-              <ion-spinner name="crescent"></ion-spinner>
-              <span>Chargement des photos...</span>
-            </div>
-
-            <div v-else-if="signalementPhotos.length === 0" class="no-photos">
-              <ion-icon :icon="imageOutline"></ion-icon>
-              <span>Aucune photo pour ce signalement</span>
-            </div>
-
-            <div v-else class="photos-grid">
-              <div 
-                v-for="(photo, index) in signalementPhotos" 
-                :key="photo.id || index" 
-                class="photo-item"
-                @click="openPhotoModal(photo)"
-              >
-                <img :src="photo.url" :alt="'Photo ' + (index + 1)" />
-              </div>
-            </div>
-          </div>
-        </div>
+        <SignalementDetailsPanel
+          :signalement="selectedSignalement"
+          :photos="signalementPhotos"
+          :loading-photos="loadingPhotos"
+          :format-date="formatDate"
+          @close="closeDetails"
+          @open-photo="openPhotoModal"
+        />
       </div>
 
-      <!-- Modal pour afficher la photo en grand -->
-      <ion-modal :is-open="showPhotoModal" @didDismiss="showPhotoModal = false">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>Photo</ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="showPhotoModal = false">Fermer</ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="photo-modal-content">
-          <img v-if="selectedPhoto" :src="selectedPhoto.url" class="full-photo" />
-        </ion-content>
-      </ion-modal>
+      <PhotoModal :is-open="showPhotoModal" :photo="selectedPhoto" @close="showPhotoModal = false" />
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons, IonItem, IonLabel, IonInput, IonSelect, IonSelectOption, IonIcon, IonSegment, IonSegmentButton, IonModal, IonSpinner } from '@ionic/vue';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons, IonLabel, IonIcon, IonSegment, IonSegmentButton } from '@ionic/vue';
 import L from 'leaflet';
 import { Geolocation } from '@capacitor/geolocation';
-import { getFirestore, collection, addDoc, Timestamp, GeoPoint, query, where, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, Timestamp, GeoPoint, query, where, getDocs, Blob } from 'firebase/firestore';
 import { useCollection, useCurrentUser } from 'vuefire';
 import { getAuth, signOut } from 'firebase/auth';
 import { useFirebaseAuth } from 'vuefire';
-import { locateOutline, closeOutline, imagesOutline, imageOutline } from 'ionicons/icons';
-import { logOutOutline, eyeOutline, eyeOffOutline, refreshOutline } from 'ionicons/icons';
+import { locateOutline } from 'ionicons/icons';
+import { logOutOutline, refreshOutline } from 'ionicons/icons';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { useRouter } from 'vue-router';
+import RecapPanel from '../components/RecapPanel.vue';
+import MapOverlayControls from '../components/MapOverlayControls.vue';
+import SignalementFormPanel from '../components/SignalementFormPanel.vue';
+import SignalementDetailsPanel from '../components/SignalementDetailsPanel.vue';
+import PhotoModal from '../components/PhotoModal.vue';
 
 const auth = useFirebaseAuth();
 const router = useRouter();
@@ -235,11 +129,15 @@ const signalementPhotos = ref<any[]>([]);
 const loadingPhotos = ref(false);
 const showPhotoModal = ref(false);
 const selectedPhoto = ref<any>(null);
+const selectedFiles = ref<File[]>([]);
+const photoObjectUrls = ref<string[]>([]);
 
 // Fonction pour récupérer les photos d'un signalement
 async function fetchPhotosForSignalement(signalementId: string) {
   loadingPhotos.value = true;
   signalementPhotos.value = [];
+  photoObjectUrls.value.forEach((url) => URL.revokeObjectURL(url));
+  photoObjectUrls.value = [];
   
   try {
     // Requête pour récupérer les photos liées au signalement
@@ -250,10 +148,18 @@ async function fetchPhotosForSignalement(signalementId: string) {
     
     const querySnapshot = await getDocs(photosQuery);
     
-    signalementPhotos.value = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    signalementPhotos.value = querySnapshot.docs.map(doc => {
+      const data = doc.data() as any;
+      const blobValue = data?.photo_blob;
+      let url = null;
+      if (blobValue) {
+        const bytes = blobValue.toBytes ? blobValue.toBytes() : blobValue;
+        const objectUrl = URL.createObjectURL(new window.Blob([bytes]));
+        photoObjectUrls.value.push(objectUrl);
+        url = objectUrl;
+      }
+      return { id: doc.id, ...data, url };
+    });
   } catch (error) {
     console.error('Erreur lors de la récupération des photos:', error);
     signalementPhotos.value = [];
@@ -275,6 +181,8 @@ function selectSignalement(signalement: any) {
 function closeDetails() {
   selectedSignalement.value = null;
   signalementPhotos.value = [];
+  photoObjectUrls.value.forEach((url) => URL.revokeObjectURL(url));
+  photoObjectUrls.value = [];
 }
 
 // Fonction pour ouvrir le modal photo
@@ -325,6 +233,14 @@ async function handleLogout() {
 
 function reloadPage() {
   window.location.reload();
+}
+
+function toggleRecap() {
+  showRecap.value = !showRecap.value;
+}
+
+function updateForm(nextForm: typeof form.value) {
+  form.value = nextForm;
 }
 
 /* =========================
@@ -392,7 +308,7 @@ async function validerSignalement() {
   if (!positionTemp.value || !currentUser.value) return;
 
   try {
-    await addDoc(collection(db, 'signalements'), {
+    const signalementRef = await addDoc(collection(db, 'signalements'), {
       budget: form.value.budget,
       date: Timestamp.now(),
       description: form.value.description,
@@ -403,6 +319,10 @@ async function validerSignalement() {
       user_id: currentUser.value.uid
     });
 
+    if (selectedFiles.value.length > 0) {
+      await uploadPhotosToFirestore(signalementRef.id, selectedFiles.value);
+    }
+
     // reset
     showForm.value = false;
     form.value = { statut: 'nouveau', description: '', entreprise: '', surface: 0, budget: 0 };
@@ -412,10 +332,27 @@ async function validerSignalement() {
       map.removeLayer(nouveauMarker);
       nouveauMarker = null;
     }
+
+    selectedFiles.value = [];
   } catch (error) {
     console.error('Erreur lors de l\'ajout du signalement:', error);
     alert('Erreur lors de l\'enregistrement');
   }
+}
+
+async function uploadPhotosToFirestore(signalementId: string, files: File[]) {
+  const uploads = files.map(async (file) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const blob = Blob.fromBytes(new Uint8Array(arrayBuffer));
+    return addDoc(collection(db, 'photos'), {
+      signalement_id: signalementId,
+      filename: file.name,
+      content_type: file.type || 'image/jpeg',
+      photo_blob: blob,
+      created_at: Timestamp.now()
+    });
+  });
+  await Promise.all(uploads);
 }
 
 function afficherMarkers() {
@@ -620,37 +557,6 @@ watch(signalements, (newVal) => {
   flex-direction: column;
 }
 
-.recap {
-  padding: 8px 12px;
-  background: linear-gradient(135deg, #eae366 0%, #e2af2f 100%);
-  border-bottom: 2px solid #555;
-  flex-shrink: 0;
-  z-index: 10;
-  color: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.recap p {
-  margin: 4px 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: white;
-  letter-spacing: 0.5px;
-}
-:deep(ion-button[color="light"]) {
-  --color: #FFD700 !important;
-  --background: rgba(255, 215, 0, 0.15) !important;
-  --border-radius: 8px !important;
-  font-weight: 600 !important;
-  --box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3) !important;
-  border: 1px solid rgba(255, 215, 0, 0.4) !important;
-}
-
-:deep(ion-button[color="light"]) ion-icon {
-  font-size: 24px !important;
-  color: #FFD700 !important;
-}
-
 :deep(ion-button[color="danger"]) {
   background: white !important;
   --color: #FF3838 !important;
@@ -681,214 +587,6 @@ watch(signalements, (newVal) => {
 #map {
   width: 100%;
   height: 100%;
-  /* Empêche les bugs de débordement */
-  display: block; 
-}
-
-.form {
-  width: 350px;
-  flex-shrink: 0;
-  background: #ffffff;
-  border-left: 1px solid #ddd;
-  padding: 16px;
-  overflow-y: auto;
-  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
-}
-
-.form h3 {
-  margin: 0 0 16px 0;
-  font-size: 16px;
-  color: #333;
-}
-
-.form ion-item {
-  margin-bottom: 12px;
-}
-
-.form ion-button {
-  margin-top: 8px;
-}
-
-/* Panel de détails du signalement */
-.details-panel {
-  width: 380px;
-  flex-shrink: 0;
-  background: #ffffff;
-  border-left: 1px solid #ddd;
-  padding: 16px;
-  overflow-y: auto;
-  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
-}
-
-.details-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #eee;
-}
-
-.details-header h3 {
-  margin: 0;
-  font-size: 18px;
-  color: #333;
-}
-
-.details-content {
-  margin-bottom: 20px;
-}
-
-.details-content p {
-  margin: 8px 0;
-  font-size: 14px;
-  color: #555;
-}
-
-/* Section Photos */
-.photos-section {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid #eee;
-}
-
-.photos-section h4 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 16px 0;
-  font-size: 16px;
-  color: #333;
-}
-
-.photos-section h4 ion-icon {
-  font-size: 20px;
-  color: #3880ff;
-}
-
-.loading-photos {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 20px;
-  color: #666;
-}
-
-.no-photos {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 30px;
-  color: #999;
-  text-align: center;
-}
-
-.no-photos ion-icon {
-  font-size: 48px;
-  margin-bottom: 10px;
-  opacity: 0.5;
-}
-
-.photos-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-
-.photo-item {
-  aspect-ratio: 1;
-  border-radius: 8px;
-  overflow: hidden;
-  cursor: pointer;
-  border: 2px solid #eee;
-  transition: all 0.2s ease;
-}
-
-.photo-item:hover {
-  border-color: #3880ff;
-  transform: scale(1.02);
-}
-
-.photo-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* Modal photo */
-.photo-modal-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #000;
-}
-
-.full-photo {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-/* Styles pour la légende de la carte */
-.map-legend-overlay {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 1000;
-  background: white;
-  padding: 10px;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-  max-width: 150px;
-}
-
-.legend-title {
-  font-size: 12px;
-  font-weight: bold;
-  margin: 0 0 8px 0;
-  text-align: center;
-  color: #333;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 5px;
-}
-
-.legend-icon {
-  width: 16px;
-  height: 25px;
-  margin-right: 8px;
-}
-
-.legend-item span {
-  font-size: 12px;
-  color: #555;
-}
-
-/* Bouton Voir recap flottant */
-.see-recap-btn {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  z-index: 1000;
-  background: white;
-  color: #333;
-  border: none;
-  border-radius: 20px;
-  padding: 8px 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.see-recap-btn ion-icon {
-  font-size: 18px;
+  display: block;
 }
 </style>
