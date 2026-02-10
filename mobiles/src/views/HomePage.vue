@@ -352,7 +352,7 @@ const markerIcons: Record<string, L.Icon> = {
   en_cours: markerIconBase.orange,
   'En cours': markerIconBase.orange,
   termine: markerIconBase.green,
-  'Terminé': markerIconBase.green
+  'Termine': markerIconBase.green
 };
 
 const statusLabels: Record<string, string> = {
@@ -360,8 +360,8 @@ const statusLabels: Record<string, string> = {
   'Nouveau': 'Nouveau',
   en_cours: 'En cours',
   'En cours': 'En cours',
-  termine: 'Terminé',
-  'Terminé': 'Terminé'
+  termine: 'Termine',
+  'Termine': 'Termine'
 };
 
 function activerSignalement() {
@@ -380,7 +380,7 @@ async function validerSignalement() {
     const statusMap: Record<string, string> = {
       nouveau: 'Nouveau',
       en_cours: 'En cours',
-      termine: 'Terminé'
+      termine: 'Termine'
     };
 
     const signalementRef = await addDoc(collection(db, 'signalements'), {
