@@ -11,6 +11,7 @@ async function getAllFirebaseUsers() {
     firebase_uid: user.uid,
     email: user.email,
     email_verified: user.emailVerified,
+    disabled: user.disabled,
     created_at: new Date(user.metadata.creationTime),
     last_login: user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime) : null
   }));
@@ -19,7 +20,7 @@ async function getAllFirebaseUsers() {
 
 async function getAllPostgreSQLUsers() {
   const result = await executeQuery(
-    "SELECT id, email, firebase_uid, email_verified, created_at, last_login FROM users"
+    "SELECT id, email, firebase_uid, email_verified, created_at, last_login, blocked_until FROM users"
   );
   return result.rows;
 }
@@ -37,18 +38,20 @@ async function syncFirebaseToPostgreSQL() {
     );
 
     if (existing.rows.length > 0) {
+      const blockedUntil = fbUser.disabled ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null;
       await executeQuery(
         `UPDATE users SET firebase_uid = $1, email = $2, email_verified = $3, 
-         last_login = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5`,
-        [fbUser.firebase_uid, fbUser.email, fbUser.email_verified, fbUser.last_login, existing.rows[0].id]
+         last_login = $4, blocked_until = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6`,
+        [fbUser.firebase_uid, fbUser.email, fbUser.email_verified, fbUser.last_login, blockedUntil, existing.rows[0].id]
       );
       updated++;
     } else {
+      const blockedUntil = fbUser.disabled ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null;
       const password = await bcrypt.hash("firebase_" + fbUser.firebase_uid, 10);
       await executeQuery(
-        `INSERT INTO users (email, password, firebase_uid, email_verified, last_login, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [fbUser.email, password, fbUser.firebase_uid, fbUser.email_verified, fbUser.last_login, fbUser.created_at]
+        `INSERT INTO users (email, password, firebase_uid, email_verified, last_login, blocked_until, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [fbUser.email, password, fbUser.firebase_uid, fbUser.email_verified, fbUser.last_login, blockedUntil, fbUser.created_at]
       );
       created++;
     }
@@ -64,11 +67,13 @@ async function syncPostgreSQLToFirebase() {
   let created = 0, updated = 0;
 
   for (const pgUser of pgUsers) {
+    const isBlocked = Boolean(pgUser.blocked_until && new Date(pgUser.blocked_until) > new Date());
     try {
       if (pgUser.firebase_uid) {
         await admin.auth().updateUser(pgUser.firebase_uid, {
           email: pgUser.email,
-          emailVerified: pgUser.email_verified
+          emailVerified: pgUser.email_verified,
+          disabled: isBlocked
         });
         updated++;
       } else {
@@ -76,7 +81,8 @@ async function syncPostgreSQLToFirebase() {
         const userRecord = await admin.auth().createUser({
           email: pgUser.email,
           password: password,
-          emailVerified: pgUser.email_verified || false
+          emailVerified: pgUser.email_verified || false,
+          disabled: isBlocked
         });
         
         await executeQuery(

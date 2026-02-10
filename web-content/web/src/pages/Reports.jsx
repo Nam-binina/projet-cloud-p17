@@ -81,6 +81,12 @@ const Reports = () => {
     setSelectedReport(report);
   };
 
+  const handleClosePhotos = () => {
+    setPhotos([]);
+    setPhotosError(null);
+    setPhotosOpen(false);
+  };
+
   const handleViewPhotos = async () => {
     if (!selectedReport?.id) {
       return;
@@ -102,6 +108,9 @@ const Reports = () => {
         url: `${API_URL}/uploads/signalements/${selectedReport.id}/${name}`
       }));
       setPhotos(photoItems);
+      if (photoItems.length === 0) {
+        setPhotosError('Aucune photo disponible');
+      }
     } catch (err) {
       console.error('Erreur chargement photos:', err);
       setPhotos([]);
@@ -461,11 +470,11 @@ const Reports = () => {
       )}
 
       {photosOpen && (
-        <div className="photo-modal-overlay" onClick={() => setPhotosOpen(false)}>
+        <div className="photo-modal-overlay" onClick={handleClosePhotos}>
           <div className="photo-modal" onClick={(e) => e.stopPropagation()}>
             <div className="photo-modal-header">
               <h3>Photos du signalement</h3>
-              <button className="close-btn" onClick={() => setPhotosOpen(false)}>✕</button>
+              <button className="close-btn" onClick={handleClosePhotos}>✕</button>
             </div>
             <div className="photo-modal-content">
               {photosLoading && <p>Chargement...</p>}

@@ -21,12 +21,16 @@ const Map = ({ userData }) => {
   const [photosLoading, setPhotosLoading] = useState(false);
   const [showInterventionForm, setShowInterventionForm] = useState(false);
   const [interventionSignalement, setInterventionSignalement] = useState(null);
+  const [photosError, setPhotosError] = useState(null);
+  const [uploadPhotos, setUploadPhotos] = useState([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [uploadPhotosError, setUploadPhotosError] = useState(null);
+  const [uploadPhotosSuccess, setUploadPhotosSuccess] = useState(null);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
 
   useEffect(() => {
-    // Load Leaflet CSS and JS only once
     if (!window.L) {
       console.log('Leaflet not found, loading...');
       
@@ -41,7 +45,6 @@ const Map = ({ userData }) => {
       leafletScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
       leafletScript.onload = () => {
         console.log('Leaflet JS loaded successfully');
-        // Small delay to ensure Leaflet is fully initialized
         setTimeout(() => {
           initializeMap();
           loadAllSignalements();
@@ -56,7 +59,6 @@ const Map = ({ userData }) => {
     }
 
     return () => {
-      // Cleanup on unmount
       if (mapInstanceRef.current) {
         console.log('Cleaning up map');
         mapInstanceRef.current.remove();
@@ -68,13 +70,10 @@ const Map = ({ userData }) => {
   const initializeMap = () => {
     const L = window.L;
     
-    // Don't reinitialize if map already exists
     if (mapInstanceRef.current) {
       console.log('Map already exists, skipping reinitialization');
       return;
     }
-
-    // Clear the container
     if (mapRef.current) {
       mapRef.current.innerHTML = '';
     }
@@ -89,19 +88,16 @@ const Map = ({ userData }) => {
     mapInstanceRef.current = map;
     console.log('Map initialized successfully');
 
-    // Determine tile server URL based on environment
     const isBrowser = typeof window !== 'undefined';
     const isLocalDev = isBrowser && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
     
-    // In local dev (npm run dev): use localhost:8081
-    // In Docker/production: use tile-server:80 which gets proxied by nginx
+
     const tileServerUrl = isLocalDev 
       ? 'http://localhost:8081/tile/{z}/{x}/{y}.png'
       : '/tile-server/tile/{z}/{x}/{y}.png';
     
     console.log('Using tile server URL:', tileServerUrl, '(isLocalDev:', isLocalDev, ')');
 
-    // Try Tile Server first, fall back to CartoDB if CORS issues
     const tileLayer = L.tileLayer(tileServerUrl, {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 20,
@@ -110,7 +106,6 @@ const Map = ({ userData }) => {
       errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
     });
 
-    // Fallback to CartoDB if Tile Server fails
     const fallbackLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       attribution: '© OpenStreetMap contributors © CARTO',
       maxZoom: 20,
@@ -118,7 +113,6 @@ const Map = ({ userData }) => {
       subdomains: 'abcd'
     });
 
-    // Try Tile Server, switch to CartoDB on error
     tileLayer.on('tileerror', () => {
       console.warn('Tile Server unavailable, switching to CartoDB');
       tileLayer.remove();
@@ -583,6 +577,57 @@ const Map = ({ userData }) => {
     }
   };
 
+  const handleClosePhotos = () => {
+    setPhotos([]);
+    setPhotosError(null);
+    setPhotosOpen(false);
+  };
+
+  const handleUploadPhotosChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    setUploadPhotos(files);
+    setUploadPhotosError(null);
+    setUploadPhotosSuccess(null);
+  };
+
+  const handleUploadPhotos = async () => {
+    if (!selectedSignalement?.id || uploadPhotos.length === 0) {
+      return;
+    }
+
+    setUploadingPhotos(true);
+    setUploadPhotosError(null);
+    setUploadPhotosSuccess(null);
+
+    try {
+      const formData = new FormData();
+      uploadPhotos.forEach((file) => {
+        formData.append('photos', file);
+      });
+
+      const response = await fetch(`${API_URL}/api/signalements/${selectedSignalement.id}/photos`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || 'Erreur lors de l\'upload des photos');
+      }
+
+      setUploadPhotosSuccess('✅ Photos ajoutées avec succès');
+      setUploadPhotos([]);
+      if (photosOpen) {
+        await handleViewPhotos();
+      }
+    } catch (error) {
+      console.error('Erreur upload photos:', error);
+      setUploadPhotosError(error.message || 'Erreur lors de l\'upload des photos');
+    } finally {
+      setUploadingPhotos(false);
+    }
+  };
+
   const handleViewPhotos = async () => {
     if (!selectedSignalement?.id) {
       return;
@@ -590,6 +635,7 @@ const Map = ({ userData }) => {
 
     setPhotosLoading(true);
     setPhotosOpen(true);
+    setPhotosError(null);
 
     try {
       const response = await fetch(`${API_URL}/api/signalements/${selectedSignalement.id}/photos`);
@@ -603,9 +649,13 @@ const Map = ({ userData }) => {
         url: `${API_URL}/uploads/signalements/${selectedSignalement.id}/${name}`
       }));
       setPhotos(photoItems);
+      if (photoItems.length === 0) {
+        setPhotosError('Aucune photo disponible');
+      }
     } catch (err) {
       console.error('Erreur chargement photos:', err);
       setPhotos([]);
+      setPhotosError('Aucune photo disponible');
     } finally {
       setPhotosLoading(false);
     }
@@ -873,6 +923,48 @@ const Map = ({ userData }) => {
                     Créer une intervention
                   </button>
                 </div>
+
+                {userData?.userType !== 'visitor' && (
+                  <div className="signalement-actions" style={{ marginTop: '12px' }}>
+                    <label htmlFor="upload-photos" style={{ display: 'block', fontWeight: 600, marginBottom: '8px' }}>
+                      Ajouter des photos
+                    </label>
+                    <input
+                      id="upload-photos"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleUploadPhotosChange}
+                      disabled={uploadingPhotos}
+                    />
+                    <button
+                      className="btn-view-photos"
+                      onClick={handleUploadPhotos}
+                      disabled={uploadingPhotos || uploadPhotos.length === 0}
+                      style={{
+                        width: '100%',
+                        padding: '10px 16px',
+                        backgroundColor: uploadPhotos.length === 0 ? '#c9c9c9' : '#401511',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: uploadPhotos.length === 0 ? 'not-allowed' : 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        marginTop: '8px',
+                        transition: 'background-color 0.2s ease'
+                      }}
+                    >
+                      {uploadingPhotos ? 'Upload en cours...' : '📤 Ajouter les photos'}
+                    </button>
+                    {uploadPhotosError && (
+                      <p style={{ color: '#b00020', marginTop: '8px' }}>{uploadPhotosError}</p>
+                    )}
+                    {uploadPhotosSuccess && (
+                      <p style={{ color: '#1b5e20', marginTop: '8px' }}>{uploadPhotosSuccess}</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1000,15 +1092,16 @@ const Map = ({ userData }) => {
 
           {/* Photos Modal */}
           {photosOpen && (
-            <div className="photo-modal-overlay" onClick={() => setPhotosOpen(false)}>
+            <div className="photo-modal-overlay" onClick={handleClosePhotos}>
               <div className="photo-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="photo-modal-header">
                   <h3>Photos du signalement</h3>
-                  <button className="close-btn" onClick={() => setPhotosOpen(false)}>✕</button>
+                  <button className="close-btn" onClick={handleClosePhotos}>✕</button>
                 </div>
                 <div className="photo-modal-content">
                   {photosLoading && <p>Chargement...</p>}
-                  {!photosLoading && photos.length === 0 && <p>Aucune photo disponible</p>}
+                  {!photosLoading && photosError && <p>{photosError}</p>}
+                  {!photosLoading && !photosError && photos.length === 0 && <p>Aucune photo disponible</p>}
                   {!photosLoading && photos.length > 0 && (
                     <div className="photo-grid">
                       {photos.map((photo) => (

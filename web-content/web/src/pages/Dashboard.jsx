@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import './Dashboard.css';
 
-// Determine API URL based on environment
 const getApiUrl = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
@@ -29,16 +28,19 @@ const Dashboard = () => {
     try {
       const response = await fetch(`${API_URL}/api/sync`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         }
       });
 
+      const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(`Sync failed: ${response.statusText}`);
+        const message = payload?.error || response.statusText;
+        throw new Error(`Sync failed: ${message}`);
       }
 
-      const data = await response.json();
+      const data = payload;
       setSyncResult(data.data);
       setLastSync(new Date().toLocaleString());
     } catch (error) {
@@ -271,6 +273,12 @@ const Dashboard = () => {
           ✅ Sync completed! 
           <span> Firebase → PostgreSQL: {syncResult.firebase_to_pg?.created || 0} created, {syncResult.firebase_to_pg?.updated || 0} updated</span>
           <span> | PostgreSQL → Firebase: {syncResult.pg_to_firebase?.created || 0} created, {syncResult.pg_to_firebase?.updated || 0} updated</span>
+          {syncResult.signalements && (
+            <span> | Signalements: {syncResult.signalements.created || 0} created, {syncResult.signalements.updated || 0} updated</span>
+          )}
+          {syncResult.photos && (
+            <span> | Photos: {syncResult.photos.synced || 0} synced, {syncResult.photos.skipped || 0} skipped</span>
+          )}
         </div>
       )}
 

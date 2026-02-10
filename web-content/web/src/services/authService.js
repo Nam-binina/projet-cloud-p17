@@ -1,37 +1,25 @@
-// All authentication is handled via backend API
-// No client-side Firebase needed - backend manages hybrid Firebase/PostgreSQL auth
-
-// Determine API URL based on environment
 const getApiUrl = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
-  // In development (Vite), use localhost:3000
-  // In production/Docker, the web and auth-api are on the same network
   if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
     return 'http://localhost:3000';
   }
-  // In Docker, use the service name and port 80 (reverse proxy assumed)
   return `http://${window.location.hostname}:3000`;
 };
 
 const API_URL = getApiUrl();
 
-/**
- * Check if user has internet connection
- */
 export const isOnline = () => {
   return navigator.onLine;
 };
 
-/**
- * Login with backend API (Firebase or PostgreSQL, handled server-side)
- */
 export const loginUser = async (email, password, userType) => {
   try {
     console.log('Logging in via backend API (hybrid Firebase/PostgreSQL)...');
     const response = await fetch(`${API_URL}/api/login`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       },
@@ -44,13 +32,12 @@ export const loginUser = async (email, password, userType) => {
 
     const data = await response.json();
     
-    // Backend returns either Firebase or PostgreSQL result
     const userData = {
       uid: data.user?.uid || data.user?.id,
       email: data.user?.email,
       userType,
       token: data.idToken || data.token,
-      provider: data.provider, // 'firebase' or 'postgresql'
+      provider: data.provider, 
       lastLogin: new Date().toISOString()
     };
 
@@ -62,14 +49,12 @@ export const loginUser = async (email, password, userType) => {
   }
 };
 
-/**
- * Register new user via backend API (hybrid Firebase/PostgreSQL)
- */
 export const registerUser = async (email, password, userType) => {
   try {
     console.log('Registering via backend API (hybrid Firebase/PostgreSQL)...');
     const response = await fetch(`${API_URL}/api/register`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       },
@@ -82,13 +67,12 @@ export const registerUser = async (email, password, userType) => {
 
     const data = await response.json();
     
-    // Backend returns either Firebase or PostgreSQL result
     const userData = {
       uid: data.user?.uid || data.user?.id,
       email: data.user?.email,
       userType,
       token: data.idToken || data.token,
-      provider: data.provider, // 'firebase' or 'postgresql'
+      provider: data.provider, 
       lastLogin: new Date().toISOString()
     };
 
@@ -100,17 +84,13 @@ export const registerUser = async (email, password, userType) => {
   }
 };
 
-/**
- * Get current authenticated user
- */
+
 export const getCurrentUser = () => {
   const authData = localStorage.getItem('authData');
   return authData ? JSON.parse(authData) : null
 };
 
-/**
- * Logout user
- */
+
 export const logoutUser = async () => {
   try {
     localStorage.removeItem('authData');
@@ -122,9 +102,7 @@ export const logoutUser = async () => {
   }
 };
 
-/**
- * Validate token
- */
+
 export const validateToken = async (token) => {
   try {
     const response = await fetch(`${API_URL}/auth/validate`, {
@@ -140,9 +118,7 @@ export const validateToken = async (token) => {
   }
 };
 
-/**
- * Get all users
- */
+
 export const getAllUsers = async () => {
   try {
     const response = await fetch(`${API_URL}/api/users`, {
@@ -164,13 +140,11 @@ export const getAllUsers = async () => {
   }
 };
 
-/**
- * Block a user by email
- */
+
 export const blockUser = async (email, durationMinutes = 1440) => {
   try {
     console.log(`Blocage de l'utilisateur ${email} pour ${durationMinutes} minutes...`);
-    const response = await fetch(`${API_URL}/api/firebase/block-user`, {
+    const response = await fetch(`${API_URL}/api/users/block`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -190,13 +164,11 @@ export const blockUser = async (email, durationMinutes = 1440) => {
   }
 };
 
-/**
- * Unblock a user by email
- */
+
 export const unblockUser = async (email) => {
   try {
     console.log(`Déblocage de l'utilisateur ${email}...`);
-    const response = await fetch(`${API_URL}/api/firebase/unblock-user`, {
+    const response = await fetch(`${API_URL}/api/users/unblock`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -216,9 +188,7 @@ export const unblockUser = async (email) => {
   }
 };
 
-/**
- * Listen to online/offline events
- */
+
 export const setupConnectivityListener = (onOnline, onOffline) => {
   window.addEventListener('online', onOnline);
   window.addEventListener('offline', onOffline);

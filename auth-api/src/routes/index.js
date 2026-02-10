@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const verifyToken = require('../middleware');
+const requireRole = require('../middleware/requireRole');
 
 const authController = require('../controllers/auth-controller');
 const firebaseAuthController = require('../controllers/firebase-auth-controller');
@@ -12,7 +13,7 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 
-const uploadRoot = path.resolve(__dirname, '../../../web-content/web/public/uploads');
+const uploadRoot = process.env.UPLOAD_DIR || path.resolve(__dirname, '../../uploads');
 
 const storage = multer.diskStorage({
 	destination: (req, file, cb) => {
@@ -37,16 +38,18 @@ router.post('/api/register', authController.registerUser);
 router.post('/api/login', authController.loginUser);
 router.post('/api/logout', authController.logoutUser);
 router.post('/api/reset-password', authController.resetPassword);
+router.put('/api/users/:id/password', authController.changePassword);
 router.get('/api/auth/status', authController.getStatus);
-router.post('/api/firebase/block-user',authController.blockUser);
-router.post('/api/firebase/unblock-user',authController.unblockUser);
+router.post('/api/users/block', authController.blockUser);
+router.post('/api/users/unblock', authController.unblockUser);
 router.get('/api/users',authController.getAllUsers);
-router.post('/api/sync', authController.syncDatabases);
+router.post('/api/sync', verifyToken, requireRole('manager'), authController.syncDatabases);
+router.post('/api/token/refresh', authController.refreshToken);
 
-router.post('/api/firebase/register', firebaseAuthController.registerUser);
-router.post('/api/firebase/login', firebaseAuthController.loginUser);
-router.post('/api/firebase/logout', firebaseAuthController.logoutUser);
-router.post('/api/firebase/reset-password', firebaseAuthController.resetPassword);
+// router.post('/api/firebase/register', firebaseAuthController.registerUser);
+// router.post('/api/firebase/login', firebaseAuthController.loginUser);
+// router.post('/api/firebase/logout', firebaseAuthController.logoutUser);
+// router.post('/api/firebase/reset-password', firebaseAuthController.resetPassword);
 
 
 

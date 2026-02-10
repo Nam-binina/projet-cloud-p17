@@ -356,7 +356,7 @@ const Statistics = ({ userData }) => {
             <tbody>
               {detailedSignalements.map((s) => (
                 <tr key={s.id}>
-                  <td>{s.id?.substring(0, 8) || '-'}</td>
+                  <td>{s.id !== undefined && s.id !== null ? String(s.id).slice(0, 8) : '-'}</td>
                   <td className="desc-cell" title={s.description}>
                     {s.description.length > 30 
                       ? s.description.substring(0, 30) + '...' 
