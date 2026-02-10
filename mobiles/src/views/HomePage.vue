@@ -192,7 +192,7 @@ import { ref, onMounted, computed, watch } from 'vue';
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons, IonItem, IonLabel, IonInput, IonSelect, IonSelectOption, IonIcon, IonSegment, IonSegmentButton, IonModal, IonSpinner } from '@ionic/vue';
 import L from 'leaflet';
 import { Geolocation } from '@capacitor/geolocation';
-import { getFirestore, collection, addDoc, Timestamp, GeoPoint, query, where, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { useCollection, useCurrentUser } from 'vuefire';
 import { getAuth, signOut } from 'firebase/auth';
 import { useFirebaseAuth } from 'vuefire';
@@ -347,8 +347,8 @@ const form = ref({
 });
 
 //  Icônes personnalisées par statut
-const markerIcons = {
-  nouveau: L.icon({
+const markerIconBase = {
+  red: L.icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
     iconSize: [25, 41],
@@ -356,7 +356,7 @@ const markerIcons = {
     popupAnchor: [1, -34],
     shadowSize: [41, 41]
   }),
-  en_cours: L.icon({
+  orange: L.icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
     iconSize: [25, 41],
@@ -364,7 +364,7 @@ const markerIcons = {
     popupAnchor: [1, -34],
     shadowSize: [41, 41]
   }),
-  termine: L.icon({
+  green: L.icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
     iconSize: [25, 41],
@@ -374,10 +374,23 @@ const markerIcons = {
   })
 };
 
+// Mapping statut → icône (supporte les deux formats : minuscule et majuscule)
+const markerIcons: Record<string, L.Icon> = {
+  nouveau: markerIconBase.red,
+  'Nouveau': markerIconBase.red,
+  en_cours: markerIconBase.orange,
+  'En cours': markerIconBase.orange,
+  termine: markerIconBase.green,
+  'Terminé': markerIconBase.green
+};
+
 const statusLabels: Record<string, string> = {
   nouveau: 'Nouveau',
+  'Nouveau': 'Nouveau',
   en_cours: 'En cours',
-  termine: 'Terminé'
+  'En cours': 'En cours',
+  termine: 'Terminé',
+  'Terminé': 'Terminé'
 };
 
 function activerSignalement() {
@@ -392,14 +405,25 @@ async function validerSignalement() {
   if (!positionTemp.value || !currentUser.value) return;
 
   try {
+    // Format attendu par Firebase (map, pas GeoPoint)
+    const statusMap: Record<string, string> = {
+      nouveau: 'Nouveau',
+      en_cours: 'En cours',
+      termine: 'Terminé'
+    };
+
     await addDoc(collection(db, 'signalements'), {
-      budget: form.value.budget,
-      date: Timestamp.now(),
+      budget: Number(form.value.budget),
+      date: new Date().toISOString(),
       description: form.value.description,
-      entreprise: form.value.entreprise || null, // N/A si vide
-      position: new GeoPoint(positionTemp.value.lat, positionTemp.value.lng),
-      status: form.value.statut,
-      surface: form.value.surface,
+      entreprise: form.value.entreprise || '',
+      photos: [],
+      position: {
+        latitude: positionTemp.value.lat,
+        longitude: positionTemp.value.lng
+      },
+      status: statusMap[form.value.statut] || 'Nouveau',
+      surface: Number(form.value.surface),
       user_id: currentUser.value.uid
     });
 
@@ -428,7 +452,7 @@ function afficherMarkers() {
   if (filteredSignalements.value) {
     filteredSignalements.value.forEach((s: any) => {
       if (s.position && s.position.latitude && s.position.longitude) {
-        const icon = markerIcons[s.status as keyof typeof markerIcons] || markerIcons.nouveau;
+        const icon = markerIcons[s.status] || markerIconBase.red;
         const marker = L.marker([s.position.latitude, s.position.longitude], { icon });
         
         // Popup avec infos du signalement et bouton pour voir les détails
@@ -439,7 +463,7 @@ function afficherMarkers() {
           <b>Entreprise:</b> ${s.entreprise ?? 'N/A'}<br>
           <b>Description:</b> ${s.description}<br>
           <b>Budget:</b> ${s.budget} Ar<br>
-          <b>Date:</b> ${s.date?.toDate?.().toLocaleDateString() || 'N/A'}
+          <b>Date:</b> ${s.date?.toDate ? s.date.toDate().toLocaleDateString() : (s.date ? new Date(s.date).toLocaleDateString() : 'N/A')}
         `;
         
         const detailsBtn = document.createElement('button');
@@ -634,7 +658,7 @@ watch(signalements, (newVal) => {
   margin: 4px 0;
   font-size: 12px;
   font-weight: 600;
-  color: white;
+  color: black;
   letter-spacing: 0.5px;
 }
 :deep(ion-button[color="light"]) {
