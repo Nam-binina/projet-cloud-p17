@@ -93,7 +93,7 @@ router.post('/', async (req, res) => {
              (title, description, repair_level, surface_m2, price_per_m2, location, assigned_to, signalement_id)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING *`,
-            [title, description, repair_level, surface_m2, current_price_per_m2, location, assigned_to, signalement_id]
+            [title, description, repair_level, surface_m2, current_price_per_m2, location, assigned_to, signalement_id || null]
         );
         
         const intervention = result.rows[0];

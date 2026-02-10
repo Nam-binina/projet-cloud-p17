@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS interventions (
     status VARCHAR(50) DEFAULT 'pending',
     assigned_to INTEGER,
     created_by INTEGER,
-    signalement_id INTEGER,
+    signalement_id VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
