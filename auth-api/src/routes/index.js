@@ -6,6 +6,8 @@ const authController = require('../controllers/auth-controller');
 const firebaseAuthController = require('../controllers/firebase-auth-controller');
 const PostsController = require('../controllers/posts-controller.js');
 const signalementController = require("../controllers/signalement-controller.js");
+const pricingRoutes = require('./pricing.routes');
+const interventionsRoutes = require('./interventions.routes');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
@@ -59,5 +61,9 @@ router.post("/api/signalements/:id/photos", upload.array('photos', 6), signaleme
 router.get("/api/signalements/:id/photos", signalementController.listPhotos);
 
 router.get('/api/posts', verifyToken, PostsController.getPosts);
+
+// Routes Manager - Pricing et Interventions
+router.use('/api/pricing', pricingRoutes);
+router.use('/api/interventions', interventionsRoutes);
 
 module.exports = router;

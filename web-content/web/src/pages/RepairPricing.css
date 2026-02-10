@@ -1,0 +1,384 @@
+.repair-pricing {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.repair-pricing h1 {
+  margin-bottom: 30px;
+  color: #333;
+  font-size: 28px;
+}
+
+.repair-pricing.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  font-size: 18px;
+  color: #666;
+}
+
+.message {
+  padding: 12px 20px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.message.success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.message.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.config-section {
+  background: #fff;
+  border-radius: 10px;
+  padding: 25px;
+  margin-bottom: 25px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.config-section h2 {
+  margin: 0 0 20px 0;
+  color: #444;
+  font-size: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.section-header h2 {
+  margin: 0;
+  border: none;
+  padding: 0;
+}
+
+/* Prix Config */
+.price-config {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.price-input-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.price-input-group input {
+  font-size: 28px;
+  width: 150px;
+  padding: 12px 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  text-align: right;
+  transition: border-color 0.2s;
+}
+
+.price-input-group input:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.currency {
+  font-size: 20px;
+  color: #666;
+  font-weight: 500;
+}
+
+.last-update {
+  color: #888;
+  font-size: 14px;
+  margin-top: 15px;
+}
+
+/* Buttons */
+.btn-save, .btn-calculate, .btn-new, .btn-create {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-save {
+  background: #28a745;
+  color: white;
+}
+
+.btn-save:hover:not(:disabled) {
+  background: #218838;
+}
+
+.btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-calculate {
+  background: #007bff;
+  color: white;
+}
+
+.btn-calculate:hover {
+  background: #0056b3;
+}
+
+.btn-new {
+  background: #6c63ff;
+  color: white;
+}
+
+.btn-new:hover {
+  background: #5a52e0;
+}
+
+.btn-create {
+  background: #28a745;
+  color: white;
+}
+
+.btn-create:hover {
+  background: #218838;
+}
+
+/* Levels Table */
+.levels-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.levels-table th,
+.levels-table td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.levels-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #555;
+}
+
+.levels-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.level-number {
+  font-weight: bold;
+  font-size: 18px;
+  color: #007bff;
+}
+
+/* Calculator */
+.formula-info {
+  background: #e7f3ff;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  color: #0056b3;
+}
+
+.calculator-form {
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: #555;
+  font-size: 14px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  padding: 10px 14px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 15px;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.result {
+  margin-top: 25px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 8px;
+  border-left: 4px solid #28a745;
+}
+
+.result .formula {
+  color: #666;
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.result .total {
+  font-size: 24px;
+  color: #333;
+}
+
+.result .total strong {
+  color: #28a745;
+}
+
+/* New Intervention Form */
+.new-intervention-form {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.form-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 15px;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+.form-group.full-width {
+  width: 100%;
+  margin-bottom: 15px;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 10px;
+}
+
+/* Interventions Table */
+.interventions-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.interventions-table th,
+.interventions-table td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.interventions-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #555;
+}
+
+.interventions-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.interventions-table .no-data {
+  text-align: center;
+  color: #888;
+  padding: 40px;
+}
+
+.level-badge {
+  background: #e7f3ff;
+  color: #0056b3;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.budget {
+  font-weight: 600;
+  color: #28a745;
+}
+
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.status-pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-in_progress {
+  background: #cce5ff;
+  color: #004085;
+}
+
+.status-completed {
+  background: #d4edda;
+  color: #155724;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .price-config {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .calculator-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .form-row {
+    flex-direction: column;
+  }
+  
+  .interventions-table {
+    font-size: 14px;
+  }
+  
+  .interventions-table th,
+  .interventions-table td {
+    padding: 10px 8px;
+  }
+}

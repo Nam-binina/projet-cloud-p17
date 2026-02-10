@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import Reports from './pages/Reports'
 import Map from './pages/Map'
 import Statistics from './pages/Statistics'
+import RepairPricing from './pages/RepairPricing'
 import { getCurrentUser, logoutUser } from './services/authService'
 import './App.css'
 
@@ -141,6 +142,18 @@ function App() {
           );
         }
         return <Dashboard />;
+      
+      case 'pricing':
+        if (!isManager) {
+          return (
+            <div className="access-denied">
+              <h2>🔒 Accès refusé</h2>
+              <p>Vous n'avez pas la permission d'accéder à la configuration des réparations.</p>
+              <p>Rôle requis: <strong>Manager</strong></p>
+            </div>
+          );
+        }
+        return <RepairPricing />;
       
       case 'statistics':
         return <Statistics userData={userData} />;
