@@ -101,82 +101,112 @@ watch(localPassword, (val) => emit('update:password', val));
 
 <style scoped>
 .auth-shell {
-  width: min(400px, 92vw);
+  width: min(420px, 92vw);
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  align-items: center;
+  gap: 20px;
   padding: 20px;
 }
 
 .hero {
-  color: #FFD700;
   text-align: center;
-  margin-bottom: 10px;
+  margin-bottom: 5px;
+}
+
+.logo-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .main-icon {
-  font-size: 75px;
-  color: #FFD700;
+  font-size: 80px;
+  color: #1a1a1a;
 }
 
 .hero h1 {
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 1.5px;
-  margin: 10px 0 5px;
+  letter-spacing: 2px;
+  margin: 12px 0 6px;
   font-size: 28px;
   color: #1a1a1a;
 }
 
 .hero p {
   margin: 0;
-  font-weight: 600;
-  opacity: 0.85;
+  font-weight: 500;
   font-size: 14px;
-  color: #555;
+  color: #333;
 }
 
 .card {
   background: #ffffff;
-  border-radius: 24px;
-  padding: 30px 25px;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+  border-radius: 20px;
+  padding: 32px 28px;
+  border: 2.5px solid #1a1a1a;
+  box-shadow: none;
+  width: 100%;
+}
+
+.card-header {
+  text-align: center;
+  margin-bottom: 22px;
 }
 
 .card-header h2 {
-  margin: 0 0 6px 0;
-  font-size: 20px;
+  margin: 0 0 4px 0;
+  font-size: 22px;
   font-weight: 800;
+  color: #1a1a1a;
 }
 
 .card-header p {
-  margin: 0 0 20px 0;
-  color: #555;
-  font-size: 14px;
+  margin: 0;
+  color: #4caf50;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .input-group {
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
 
 .custom-label {
   font-weight: 700;
-  margin-bottom: 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
   display: block;
+  color: #1a1a1a;
 }
 
 .field {
-  border: 1px solid #f0e6cc;
+  border: 1.5px solid #ccc;
   border-radius: 12px;
   --padding-start: 8px;
-  background: #fffdf6;
+  --background: #fff;
+  background: #fff;
+}
+
+.field ion-icon {
+  color: #555;
 }
 
 .cta {
-  margin-top: 10px;
-  --background: #FFD700;
-  --color: #1a1a1a;
-  box-shadow: 0 8px 15px rgba(255, 215, 0, 0.18);
+  margin-top: 14px;
+  --background: #e53935;
+  --color: #ffffff;
+  --background-hover: #c62828;
+  --border-radius: 30px;
+  font-weight: 800;
+  font-size: 15px;
+  height: 52px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 12px rgba(229, 57, 53, 0.3);
 }
 
 .error-box {

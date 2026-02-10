@@ -44,7 +44,7 @@ defineProps<{
   margin: 4px 0;
   font-size: 12px;
   font-weight: 600;
-  color: white;
+  color: black;
   letter-spacing: 0.5px;
 }
 
