@@ -50,6 +50,29 @@
           <MapOverlayControls :show-recap="showRecap" @toggle="toggleRecap" />
         </div>
 
+        <div v-if="filterMode === 'moi'" class="list-panel">
+          <div class="list-header">Mes signalements ({{ mySignalements.length }})</div>
+
+          <div v-if="mySignalements.length === 0" class="list-empty">
+            Aucun signalement trouve.
+          </div>
+
+          <button
+            v-else
+            v-for="signalement in mySignalements"
+            :key="getSignalementId(signalement)"
+            class="list-item"
+            @click="focusSignalement(signalement)"
+          >
+            <div class="list-title">{{ signalement.description || 'Signalement sans description' }}</div>
+            <div class="list-meta">
+              <span>{{ formatStatusLabel(signalement.status) }}</span>
+              <span>•</span>
+              <span>{{ formatDate(signalement.date) }}</span>
+            </div>
+          </button>
+        </div>
+
         <!--  Formulaire à droite -->
         <SignalementFormPanel
           :show="showForm"
@@ -66,8 +89,12 @@
           :photos="signalementPhotos"
           :loading-photos="loadingPhotos"
           :format-date="formatDate"
+          :can-add-photos="canAddPhotos"
+          :is-uploading="isUploadingPhotos"
+          :upload-error="photoUploadError"
           @close="closeDetails"
           @open-photo="openPhotoModal"
+          @add-photos="handleAddPhotos"
         />
       </div>
 
@@ -81,7 +108,7 @@ import { ref, onMounted, computed, watch } from 'vue';
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons, IonLabel, IonIcon, IonSegment, IonSegmentButton } from '@ionic/vue';
 import L from 'leaflet';
 import { Geolocation } from '@capacitor/geolocation';
-import { getFirestore, collection, addDoc, Timestamp, GeoPoint, query, where, getDocs, Blob } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, Timestamp, GeoPoint, query, where, getDocs, Bytes } from 'firebase/firestore';
 import { useCollection, useCurrentUser } from 'vuefire';
 import { getAuth, signOut } from 'firebase/auth';
 import { useFirebaseAuth } from 'vuefire';
@@ -106,6 +133,7 @@ const lastStatuses = ref<Record<string, string>>({});
    ========================= */
 const db = getFirestore();
 const currentUser = useCurrentUser();
+const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
 
 type FilterMode = 'tous' | 'moi';
 const filterMode = ref<FilterMode>('tous');
@@ -121,6 +149,13 @@ const filteredSignalements = computed(() => {
   return list.filter((s: any) => s.user_id === uid);
 });
 
+const mySignalements = computed(() => {
+  const list = signalements.value || [];
+  const uid = currentUser.value?.uid;
+  if (!uid) return [];
+  return list.filter((s: any) => s.user_id === uid);
+});
+
 /* =========================
     Signalement sélectionné et photos
    ========================= */
@@ -131,8 +166,19 @@ const showPhotoModal = ref(false);
 const selectedPhoto = ref<any>(null);
 const selectedFiles = ref<File[]>([]);
 const photoObjectUrls = ref<string[]>([]);
+const isUploadingPhotos = ref(false);
+const photoUploadError = ref('');
 
-// Fonction pour récupérer les photos d'un signalement
+const canAddPhotos = computed(() => {
+  const uid = currentUser.value?.uid;
+  const selected = selectedSignalement.value;
+  return Boolean(uid && selected && selected.user_id === uid);
+});
+
+function getSignalementId(signalement: any) {
+  return signalement?.id || signalement?.__id || signalement?.docId || signalement?.uid || null;
+}
+
 async function fetchPhotosForSignalement(signalementId: string) {
   loadingPhotos.value = true;
   signalementPhotos.value = [];
@@ -140,7 +186,6 @@ async function fetchPhotosForSignalement(signalementId: string) {
   photoObjectUrls.value = [];
   
   try {
-    // Requête pour récupérer les photos liées au signalement
     const photosQuery = query(
       collection(db, 'photos'),
       where('signalement_id', '==', signalementId)
@@ -153,7 +198,7 @@ async function fetchPhotosForSignalement(signalementId: string) {
       const blobValue = data?.photo_blob;
       let url = null;
       if (blobValue) {
-        const bytes = blobValue.toBytes ? blobValue.toBytes() : blobValue;
+        const bytes = blobValue.toUint8Array ? blobValue.toUint8Array() : blobValue;
         const objectUrl = URL.createObjectURL(new window.Blob([bytes]));
         photoObjectUrls.value.push(objectUrl);
         url = objectUrl;
@@ -168,30 +213,46 @@ async function fetchPhotosForSignalement(signalementId: string) {
   }
 }
 
-// Fonction pour sélectionner un signalement
 function selectSignalement(signalement: any) {
   selectedSignalement.value = signalement;
-  // Récupérer les photos associées
-  if (signalement.id) {
-    fetchPhotosForSignalement(signalement.id);
+  const signalementId = getSignalementId(signalement);
+  if (signalementId) {
+    fetchPhotosForSignalement(signalementId);
   }
 }
 
-// Fonction pour fermer les détails
 function closeDetails() {
   selectedSignalement.value = null;
   signalementPhotos.value = [];
   photoObjectUrls.value.forEach((url) => URL.revokeObjectURL(url));
   photoObjectUrls.value = [];
+  photoUploadError.value = '';
 }
 
-// Fonction pour ouvrir le modal photo
 function openPhotoModal(photo: any) {
   selectedPhoto.value = photo;
   showPhotoModal.value = true;
 }
 
-// Fonction pour formater la date
+async function handleAddPhotos(files: File[]) {
+  if (!selectedSignalement.value || files.length === 0) return;
+  const signalementId = getSignalementId(selectedSignalement.value);
+  if (!signalementId) return;
+
+  try {
+    photoUploadError.value = '';
+    isUploadingPhotos.value = true;
+    await uploadPhotosToFirestore(signalementId, files);
+    await fetchPhotosForSignalement(signalementId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Erreur lors de l\'ajout des photos. Veuillez reessayer.';
+    console.error('Erreur lors de l\'ajout des photos:', error);
+    photoUploadError.value = message;
+  } finally {
+    isUploadingPhotos.value = false;
+  }
+}
+
 function formatDate(date: any): string {
   if (!date) return 'N/A';
   if (date.toDate) {
@@ -200,9 +261,6 @@ function formatDate(date: any): string {
   return 'N/A';
 }
 
-/* =========================
-    Récap
-   ========================= */
 const totalSignalements = computed(() => filteredSignalements.value.length);
 
 const totalSurface = computed(() =>
@@ -223,7 +281,6 @@ async function handleLogout() {
   if (auth) {
     try {
       await signOut(auth);
-      // Optionnel : Rediriger l'utilisateur vers la page de login après déconnexion
       router.push('/login'); 
     } catch (error) {
       console.error("Erreur lors de la déconnexion :", error);
@@ -243,12 +300,10 @@ function updateForm(nextForm: typeof form.value) {
   form.value = nextForm;
 }
 
-/* =========================
-    Carte & Formulaire
-   ========================= */
 let map: L.Map;
 let nouveauMarker: L.Marker | null = null;
 let userMarker: L.Marker | null = null;
+const mapMarkers = new Map<string, L.Marker>();
 const isLocating = ref(false);
 
 const showForm = ref(false);
@@ -262,7 +317,6 @@ const form = ref({
   budget: 0
 });
 
-//  Icônes personnalisées par statut
 const markerIcons = {
   nouveau: L.icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
@@ -312,7 +366,7 @@ async function validerSignalement() {
       budget: form.value.budget,
       date: Timestamp.now(),
       description: form.value.description,
-      entreprise: form.value.entreprise || null, // N/A si vide
+      entreprise: form.value.entreprise || null, 
       position: new GeoPoint(positionTemp.value.lat, positionTemp.value.lng),
       status: form.value.statut,
       surface: form.value.surface,
@@ -323,7 +377,6 @@ async function validerSignalement() {
       await uploadPhotosToFirestore(signalementRef.id, selectedFiles.value);
     }
 
-    // reset
     showForm.value = false;
     form.value = { statut: 'nouveau', description: '', entreprise: '', surface: 0, budget: 0 };
     positionTemp.value = null;
@@ -335,15 +388,21 @@ async function validerSignalement() {
 
     selectedFiles.value = [];
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Erreur lors de l\'enregistrement';
     console.error('Erreur lors de l\'ajout du signalement:', error);
-    alert('Erreur lors de l\'enregistrement');
+    alert(message);
   }
 }
 
 async function uploadPhotosToFirestore(signalementId: string, files: File[]) {
+  const oversizedFile = files.find((file) => file.size > MAX_PHOTO_SIZE_BYTES);
+  if (oversizedFile) {
+    throw new Error(`La photo "${oversizedFile.name}" depasse la taille limite de 5 MB.`);
+  }
+
   const uploads = files.map(async (file) => {
     const arrayBuffer = await file.arrayBuffer();
-    const blob = Blob.fromBytes(new Uint8Array(arrayBuffer));
+    const blob = Bytes.fromUint8Array(new Uint8Array(arrayBuffer));
     return addDoc(collection(db, 'photos'), {
       signalement_id: signalementId,
       filename: file.name,
@@ -356,19 +415,18 @@ async function uploadPhotosToFirestore(signalementId: string, files: File[]) {
 }
 
 function afficherMarkers() {
-  // Supprimer tous les markers existants
   map.eachLayer((layer: any) => {
     if (layer instanceof L.Marker && layer !== userMarker && layer !== nouveauMarker) map.removeLayer(layer);
   });
 
-  // Ajouter les markers depuis Firebase avec couleur selon status
+  mapMarkers.clear();
+
   if (filteredSignalements.value) {
     filteredSignalements.value.forEach((s: any) => {
       if (s.position && s.position.latitude && s.position.longitude) {
         const icon = markerIcons[s.status as keyof typeof markerIcons] || markerIcons.nouveau;
         const marker = L.marker([s.position.latitude, s.position.longitude], { icon });
         
-        // Popup avec infos du signalement et bouton pour voir les détails
         const popupContent = document.createElement('div');
         popupContent.innerHTML = `
           <b>Statut:</b> ${s.status}<br>
@@ -390,8 +448,28 @@ function afficherMarkers() {
         marker.bindPopup(popupContent);
         
         marker.addTo(map);
+
+        const signalementId = getSignalementId(s);
+        if (signalementId) {
+          mapMarkers.set(signalementId, marker);
+        }
       }
     });
+  }
+}
+
+function focusSignalement(signalement: any) {
+  selectSignalement(signalement);
+  const lat = signalement?.position?.latitude;
+  const lng = signalement?.position?.longitude;
+  if (typeof lat === 'number' && typeof lng === 'number') {
+    map.setView([lat, lng], 16);
+  }
+
+  const signalementId = getSignalementId(signalement);
+  if (signalementId) {
+    const marker = mapMarkers.get(signalementId);
+    if (marker) marker.openPopup();
   }
 }
 
@@ -448,7 +526,7 @@ async function handleStatusChangeNotifications(newSignalements: any[]) {
   const notificationsPayload: Array<{ id: number; title: string; body: string }> = [];
 
   newSignalements.forEach((signalement: any) => {
-    const signalementId = signalement?.id || signalement?.__id || signalement?.docId || signalement?.uid;
+    const signalementId = getSignalementId(signalement);
     const currentStatus = signalement?.status;
 
     if (!signalementId || !currentStatus) return;
@@ -588,5 +666,60 @@ watch(signalements, (newVal) => {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+.list-panel {
+  width: 280px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-left: 1px solid #ddd;
+  padding: 12px;
+  overflow-y: auto;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.08);
+}
+
+.list-header {
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.list-empty {
+  color: #888;
+  font-size: 13px;
+  padding: 10px 4px;
+}
+
+.list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  background: #f7f7f7;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.list-item:hover {
+  border-color: #3880ff;
+  background: #f2f7ff;
+}
+
+.list-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #222;
+}
+
+.list-meta {
+  font-size: 12px;
+  color: #666;
+  display: flex;
+  gap: 6px;
 }
 </style>
