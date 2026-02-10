@@ -1,0 +1,869 @@
+{
+	"info": {
+		"_postman_id": "auth-api-hybrid-collection-v2",
+		"name": "Auth API - Hybrid System (Complet)",
+		"description": "Collection complète pour tester toutes les API du projet Cloud P17 :\n- Authentification hybride (Firebase/PostgreSQL)\n- Gestion des utilisateurs\n- Signalements (CRUD + photos)\n- Synchronisation",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Auth - Hybrid",
+			"description": "Routes d'authentification avec fallback automatique Firebase → PostgreSQL",
+			"item": [
+				{
+					"name": "GET - Statut des services",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has services info', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData).to.have.property('services');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/status",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "status"]
+						},
+						"description": "Vérifie le statut des services d'authentification (Firebase et PostgreSQL).\n\n**Response 200:**\n```json\n{ \"success\": true, \"services\": { \"firebase\": ..., \"postgresql\": ... } }\n```"
+					},
+					"response": []
+				},
+				{
+					"name": "POST - Register",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 201', function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test('Response indicates success', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData).to.have.property('provider');",
+									"    pm.expect(jsonData).to.have.property('user');",
+									"});",
+									"",
+									"pm.test('Provider is firebase or postgresql', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(['firebase', 'postgresql']).to.include(jsonData.provider);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{test_email}}\",\n    \"password\": \"{{test_password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "register"]
+						},
+						"description": "Enregistre un nouvel utilisateur avec fallback automatique Firebase → PostgreSQL.\n\n**Body:**\n- `email` (string, required)\n- `password` (string, required, min 6 caractères)\n\n**Response 201:** `{ success, message, provider, user }`\n**Response 422:** Paramètres manquants\n**Response 500:** Erreur serveur"
+					},
+					"response": []
+				},
+				{
+					"name": "POST - Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response contains user info', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData).to.have.property('provider');",
+									"    pm.expect(jsonData).to.have.property('user');",
+									"});",
+									"",
+									"pm.test('Cookie access_token is set', function () {",
+									"    pm.expect(pm.cookies.has('access_token')).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{test_email}}\",\n    \"password\": \"{{test_password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "login"]
+						},
+						"description": "Connecte un utilisateur avec fallback automatique Firebase → PostgreSQL.\nSets les cookies `access_token` et `refresh_token`.\n\n**Body:**\n- `email` (string, required)\n- `password` (string, required)\n\n**Response 200:** `{ success, message, provider, user }`\n**Response 422:** Paramètres manquants\n**Response 401:** Identifiants invalides"
+					},
+					"response": []
+				},
+				{
+					"name": "POST - Logout",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response indicates success', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logout",
+							"host": ["{{base_url}}"],
+							"path": ["api", "logout"]
+						},
+						"description": "Déconnecte l'utilisateur et supprime les cookies `access_token` et `refresh_token`.\nRévoque la session refresh si présente.\n\n**Response 200:** `{ success, message, provider }`"
+					},
+					"response": []
+				},
+				{
+					"name": "POST - Reset Password",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response indicates success', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData).to.have.property('provider');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{test_email}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/reset-password",
+							"host": ["{{base_url}}"],
+							"path": ["api", "reset-password"]
+						},
+						"description": "Réinitialise le mot de passe avec fallback Firebase → PostgreSQL.\n\n**Body:**\n- `email` (string, required)\n\n**Response 200:** `{ success, message, provider, tempPassword }`\n**Response 422:** Email manquant"
+					},
+					"response": []
+				},
+				{
+					"name": "PUT - Changer mot de passe",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response indicates success', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"old_password\": \"{{test_password}}\",\n    \"new_password\": \"NewPassword123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/users/{{user_id}}/password",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "{{user_id}}", "password"]
+						},
+						"description": "Change le mot de passe d'un utilisateur.\n\n**Path:** `/api/users/:id/password`\n\n**Body:**\n- `old_password` (string, required)\n- `new_password` (string, required, min 8 caractères)\n\n**Response 200:** `{ success, message }`\n**Response 422:** Paramètres manquants ou mot de passe trop court"
+					},
+					"response": []
+				},
+				{
+					"name": "POST - Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response indicates success', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/token/refresh",
+							"host": ["{{base_url}}"],
+							"path": ["api", "token", "refresh"]
+						},
+						"description": "Renouvelle le token d'accès via le refresh_token (cookie).\nLe refresh token est rotatif : un nouveau refresh_token est émis.\n\n**Cookies requis:** `refresh_token`\n\n**Response 200:** `{ success: true }` + nouveaux cookies\n**Response 401:** Refresh token invalide"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Users - Gestion",
+			"description": "Gestion des utilisateurs (liste, blocage, déblocage)",
+			"item": [
+				{
+					"name": "GET - Liste des utilisateurs",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response contains users array', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.users).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users"]
+						},
+						"description": "Récupère la liste de tous les utilisateurs.\n\n**Response 200:** `{ success, users: [...] }`"
+					},
+					"response": []
+				},
+				{
+					"name": "POST - Bloquer un utilisateur",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response indicates success', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{test_email}}\",\n    \"durationMinutes\": 60\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/users/block",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "block"]
+						},
+						"description": "Bloque un utilisateur pour une durée donnée.\n\n**Body:**\n- `email` (string, required)\n- `durationMinutes` (number, optional) : durée du blocage en minutes\n\n**Response 200:** `{ success, message, blockedUntil }`\n**Response 422:** Email manquant"
+					},
+					"response": []
+				},
+				{
+					"name": "POST - Débloquer un utilisateur",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response indicates success', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{test_email}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/users/unblock",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "unblock"]
+						},
+						"description": "Débloque un utilisateur.\n\n**Body:**\n- `email` (string, required)\n\n**Response 200:** `{ success, message }`\n**Response 422:** Email manquant"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Signalements",
+			"description": "CRUD des signalements + photos + nettoyage timestamps",
+			"item": [
+				{
+					"name": "GET - Liste des signalements",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response contains signalements', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData).to.have.property('signalements');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/signalements?limit=50",
+							"host": ["{{base_url}}"],
+							"path": ["api", "signalements"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "50",
+									"description": "Nombre max de signalements (défaut: 50)"
+								},
+								{
+									"key": "startAfterId",
+									"value": "",
+									"description": "ID pour pagination (cursor)",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Récupère la liste des signalements avec pagination.\n\n**Query params:**\n- `limit` (number, optional, défaut: 50)\n- `startAfterId` (string, optional) : ID du dernier élément pour pagination\n\n**Response 200:** `{ success, signalements: [...] }`"
+					},
+					"response": []
+				},
+				{
+					"name": "GET - Signalement par ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response contains signalement', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData).to.have.property('signalement');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/signalements/{{signalement_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "signalements", "{{signalement_id}}"]
+						},
+						"description": "Récupère un signalement par son ID.\n\n**Path:** `/api/signalements/:id`\n\n**Response 200:** `{ success, signalement }`\n**Response 404:** Signalement introuvable"
+					},
+					"response": []
+				},
+				{
+					"name": "GET - Signalements par user ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response contains signalements', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData).to.have.property('signalements');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/signalements/user/{{user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "signalements", "user", "{{user_id}}"]
+						},
+						"description": "Récupère tous les signalements d'un utilisateur.\n\n**Path:** `/api/signalements/user/:userId`\n\n**Response 200:** `{ success, signalements: [...] }`\n**Response 422:** User ID manquant"
+					},
+					"response": []
+				},
+				{
+					"name": "POST - Créer un signalement",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 201', function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test('Response contains signalement', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData).to.have.property('signalement');",
+									"});",
+									"",
+									"// Sauvegarder l'ID pour les requêtes suivantes",
+									"var jsonData = pm.response.json();",
+									"if (jsonData.signalement && jsonData.signalement.id) {",
+									"    pm.environment.set('signalement_id', jsonData.signalement.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"budget\": 5000,\n    \"date\": \"2026-02-10T00:00:00.000Z\",\n    \"description\": \"Route endommagée avec nids de poule\",\n    \"entreprise\": \"TP Madagascar\",\n    \"position\": {\n        \"lat\": -18.9137,\n        \"lng\": 47.5361\n    },\n    \"status\": \"Nouveau\",\n    \"surface\": 120,\n    \"user_id\": \"{{user_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/signalements",
+							"host": ["{{base_url}}"],
+							"path": ["api", "signalements"]
+						},
+						"description": "Crée un nouveau signalement.\n\n**Body (tous requis sauf date et status):**\n- `budget` (number)\n- `date` (string, ISO, défaut: maintenant)\n- `description` (string)\n- `entreprise` (string)\n- `position` (object: { lat, lng })\n- `status` (string, défaut: 'Nouveau')\n- `surface` (number)\n- `user_id` (string)\n\n**Response 201:** `{ success, message, signalement }`\n**Response 422:** Champs requis manquants"
+					},
+					"response": []
+				},
+				{
+					"name": "PUT - Modifier un signalement",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response indicates success', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"En cours\",\n    \"description\": \"Route endommagée - travaux en cours\",\n    \"budget\": 7500\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/signalements/{{signalement_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "signalements", "{{signalement_id}}"]
+						},
+						"description": "Met à jour un signalement existant. Seuls les champs fournis sont modifiés.\n\n**Path:** `/api/signalements/:id`\n\n**Body (tous optionnels):** N'importe quel champ du signalement\n\n**Response 200:** `{ success, message, signalement }`\n**Response 422:** ID manquant"
+					},
+					"response": []
+				},
+				{
+					"name": "DELETE - Supprimer un signalement",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response indicates success', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/signalements/{{signalement_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "signalements", "{{signalement_id}}"]
+						},
+						"description": "Supprime un signalement par son ID.\n\n**Path:** `/api/signalements/:id`\n\n**Response 200:** `{ success, message }`\n**Response 422:** ID manquant"
+					},
+					"response": []
+				},
+				{
+					"name": "POST - Upload photos signalement",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response contains photos', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData).to.have.property('photos');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "photos",
+									"type": "file",
+									"src": "",
+									"description": "Photo(s) du signalement (max 6 fichiers, max 10MB chacun)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/signalements/{{signalement_id}}/photos",
+							"host": ["{{base_url}}"],
+							"path": ["api", "signalements", "{{signalement_id}}", "photos"]
+						},
+						"description": "Upload de photos pour un signalement (multipart/form-data).\n\n**Path:** `/api/signalements/:id/photos`\n\n**Body (form-data):**\n- `photos` (file[], max 6 fichiers, max 10MB/fichier)\n\n**Response 200:** `{ success, photos: [...] }`"
+					},
+					"response": []
+				},
+				{
+					"name": "GET - Photos d'un signalement",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response contains photos', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData).to.have.property('photos');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/signalements/{{signalement_id}}/photos",
+							"host": ["{{base_url}}"],
+							"path": ["api", "signalements", "{{signalement_id}}", "photos"]
+						},
+						"description": "Récupère la liste des photos d'un signalement.\n\n**Path:** `/api/signalements/:id/photos`\n\n**Response 200:** `{ success, photos: [...] }`"
+					},
+					"response": []
+				},
+				{
+					"name": "POST - Cleanup timestamps",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response indicates success', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/signalements/cleanup/timestamps",
+							"host": ["{{base_url}}"],
+							"path": ["api", "signalements", "cleanup", "timestamps"]
+						},
+						"description": "Nettoie les timestamps des signalements (conversion format).\n\n**Response 200:** `{ success, message, result }`"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Sync & Protected",
+			"description": "Routes protégées et synchronisation",
+			"item": [
+				{
+					"name": "GET - Posts (Protected)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 or 401', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 401]);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/posts",
+							"host": ["{{base_url}}"],
+							"path": ["api", "posts"]
+						},
+						"description": "Route protégée nécessitant un token (cookie `access_token`).\n\n**Response 200:** Liste des posts\n**Response 401:** Non authentifié"
+					},
+					"response": []
+				},
+				{
+					"name": "POST - Sync Databases (Manager)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response indicates success', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData).to.have.property('data');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/sync",
+							"host": ["{{base_url}}"],
+							"path": ["api", "sync"]
+						},
+						"description": "Synchronise les bases de données Firebase ↔ PostgreSQL.\n⚠️ **Protégé** : nécessite `verifyToken` + rôle `manager`.\n\nEffectue :\n- Traitement de la queue de sync\n- Sync bidirectionnelle utilisateurs\n- Sync signalements depuis Firebase\n- Sync photos (bidirectionnelle)\n\n**Response 200:** `{ success, message, data: { queue, bidirectional, signalements, photos } }`\n**Response 401:** Non authentifié\n**Response 403:** Rôle insuffisant"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [""]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [""]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "test_email",
+			"value": "test@example.com",
+			"type": "string"
+		},
+		{
+			"key": "test_password",
+			"value": "TestPassword123!",
+			"type": "string"
+		},
+		{
+			"key": "user_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "signalement_id",
+			"value": "1",
+			"type": "string"
+		}
+	]
+}
