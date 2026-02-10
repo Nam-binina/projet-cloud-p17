@@ -660,37 +660,6 @@ watch(signalements, (newVal) => {
   flex-direction: column;
 }
 
-.recap {
-  padding: 8px 12px;
-  background: linear-gradient(135deg, #eae366 0%, #e2af2f 100%);
-  border-bottom: 2px solid #555;
-  flex-shrink: 0;
-  z-index: 10;
-  color: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.recap p {
-  margin: 4px 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: black;
-  letter-spacing: 0.5px;
-}
-:deep(ion-button[color="light"]) {
-  --color: #FFD700 !important;
-  --background: rgba(255, 215, 0, 0.15) !important;
-  --border-radius: 8px !important;
-  font-weight: 600 !important;
-  --box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3) !important;
-  border: 1px solid rgba(255, 215, 0, 0.4) !important;
-}
-
-:deep(ion-button[color="light"]) ion-icon {
-  font-size: 24px !important;
-  color: #FFD700 !important;
-}
-
 :deep(ion-button[color="danger"]) {
   background: white !important;
   --color: #FF3838 !important;

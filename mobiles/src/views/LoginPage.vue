@@ -120,13 +120,15 @@ async function recordFailedAttempt(refDoc: any, attemptData: any, emailValue: st
 <style>
 /* Page background and centering */
 .login-content {
-  background: linear-gradient(135deg, #eae366 0%, #e2af2f 100%);
+  --background: #FFC107;
+  background: #FFC107 !important;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .center-container {
   width: 100%;
+  min-height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -141,7 +143,7 @@ async function recordFailedAttempt(refDoc: any, attemptData: any, emailValue: st
 }
 
 .card-header p {
-  color: #666;
+  color: #4caf50;
   font-size: 13px;
   margin-top: 4px;
 }
@@ -161,27 +163,28 @@ async function recordFailedAttempt(refDoc: any, attemptData: any, emailValue: st
 }
 
 .field {
-  --background: #f8f9fa;
+  --background: #ffffff;
   --color: #1a1a1a;
   --placeholder-color: #adb5bd;
   --border-radius: 12px;
-  border: 1px solid #ddd;
+  border: 1.5px solid #ccc;
   border-radius: 12px;
 }
 
 .field ion-icon {
-  color: #1a1a1a;
+  color: #555;
 }
 
 .cta {
   margin-top: 15px;
-  --background: #FFD700; 
-  --color: #1a1a1a;
+  --background: #e53935;
+  --color: #ffffff;
   font-weight: 800;
-  height: 58px;
-  font-size: 16px;
+  height: 52px;
+  font-size: 15px;
   text-transform: uppercase;
-  box-shadow: 0 8px 15px rgba(255, 215, 0, 0.24);
+  letter-spacing: 1px;
+  box-shadow: 0 4px 12px rgba(229, 57, 53, 0.3);
 }
 
 .error-box {
