@@ -22,7 +22,7 @@
       <!-- UI Filtre : Tous / Mes signalements -->
       <ion-toolbar>
         <ion-segment v-model="filterMode">
-          <ion-segment-button value="tous">
+          <ion-segment-button value="tous" @click="toggleTousList">
             <ion-label>Tous</ion-label>
           </ion-segment-button>
           <ion-segment-button value="moi">
@@ -60,6 +60,28 @@
           <button
             v-else
             v-for="signalement in mySignalements"
+            :key="getSignalementId(signalement)"
+            class="list-item"
+            @click="focusSignalement(signalement)"
+          >
+            <div class="list-title">{{ signalement.description || 'Signalement sans description' }}</div>
+            <div class="list-meta">
+              <span>{{ formatStatusLabel(signalement.status) }}</span>
+              <span>•</span>
+              <span>{{ formatDate(signalement.date) }}</span>
+            </div>
+          </button>
+        </div>
+
+        <!-- Panel 'Tous' : utilise la même UI que 'Mes signalements' pour cohérence -->
+        <div v-if="filterMode === 'tous'" class="list-panel">
+          <div class="list-header">Tous les signalements ({{ filteredSignalements.length }})</div>
+
+          <div v-if="filteredSignalements.length === 0" class="list-empty">Aucun signalement trouvé.</div>
+
+          <button
+            v-else
+            v-for="signalement in filteredSignalements"
             :key="getSignalementId(signalement)"
             class="list-item"
             @click="focusSignalement(signalement)"
@@ -154,6 +176,23 @@ const mySignalements = computed(() => {
   const uid = currentUser.value?.uid;
   if (!uid) return [];
   return list.filter((s: any) => s.user_id === uid);
+});
+
+// UI : panneau "Tous"
+const showTousList = ref(false);
+
+function toggleTousList() {
+  showTousList.value = !showTousList.value;
+}
+
+function openFromTous(signalement: any) {
+  focusSignalement(signalement);
+  showTousList.value = false;
+}
+
+// Fermer le panneau Tous si on change de filtre
+watch(filterMode, (val) => {
+  if (val !== 'tous') showTousList.value = false;
 });
 
 /* =========================
@@ -734,6 +773,34 @@ watch(signalements, (newVal) => {
   border-color: #3880ff;
   background: #f2f7ff;
 }
+
+/* Panneau 'Tous' (overlay + panneau listé à droite) */
+.tous-overlay {
+  position: fixed;
+  top: 56px; /* laisse la place à l'header */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.28);
+  z-index: 1500; /* au-dessus de la légende */
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tous-list-panel {
+  width: 320px;
+  max-width: 90%;
+  height: 100%;
+  background: #ffffff;
+  padding: 12px 12px 24px 12px;
+  padding-top: 48px; /* éviter la superposition avec les éléments en haut (légende) */
+  overflow-y: auto;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.12);
+  z-index: 1501;
+}
+
+.tous-list-panel .list-header { margin-bottom: 10px; }
+
 
 .list-title {
   font-size: 13px;
