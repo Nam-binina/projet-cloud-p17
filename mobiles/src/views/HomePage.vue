@@ -108,7 +108,7 @@ import { ref, onMounted, computed, watch } from 'vue';
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons, IonLabel, IonIcon, IonSegment, IonSegmentButton } from '@ionic/vue';
 import L from 'leaflet';
 import { Geolocation } from '@capacitor/geolocation';
-import { getFirestore, collection, addDoc, Timestamp, query, where, getDocs, Bytes } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, query, where, getDocs, Bytes } from 'firebase/firestore';
 import { useCollection, useCurrentUser } from 'vuefire';
 import { getAuth, signOut } from 'firebase/auth';
 import { useFirebaseAuth } from 'vuefire';
@@ -133,7 +133,7 @@ const lastStatuses = ref<Record<string, string>>({});
    ========================= */
 const db = getFirestore();
 const currentUser = useCurrentUser();
-const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_PHOTO_SIZE_BYTES = 900 * 1024;
 
 type FilterMode = 'tous' | 'moi';
 const filterMode = ref<FilterMode>('tous');
@@ -422,7 +422,7 @@ async function validerSignalement() {
 async function uploadPhotosToFirestore(signalementId: string, files: File[]) {
   const oversizedFile = files.find((file) => file.size > MAX_PHOTO_SIZE_BYTES);
   if (oversizedFile) {
-    throw new Error(`La photo "${oversizedFile.name}" depasse la taille limite de 5 MB.`);
+    throw new Error(`La photo "${oversizedFile.name}" depasse la taille limite de 900 KB.`);
   }
 
   const uploads = files.map(async (file) => {
@@ -433,7 +433,7 @@ async function uploadPhotosToFirestore(signalementId: string, files: File[]) {
       filename: file.name,
       content_type: file.type || 'image/jpeg',
       photo_blob: blob,
-      created_at: Timestamp.now()
+      created_at: new Date().toISOString()
     });
   });
   await Promise.all(uploads);
