@@ -204,7 +204,7 @@ export default defineComponent({
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
-      }).addTo(map.value);
+      }).addTo(map.value as L.Map);
 
       addMarkers();
     };
@@ -221,7 +221,7 @@ export default defineComponent({
         if (point.latitude && point.longitude && map.value) {
           const marker = L.marker([point.latitude, point.longitude], {
             icon: createCustomIcon(point)
-          }).addTo(map.value);
+          }).addTo(map.value as L.Map);
 
           // Événements de survol
           marker.on('mouseover', (e: L.LeafletMouseEvent) => {
