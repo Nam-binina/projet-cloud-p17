@@ -11,23 +11,23 @@
     </ion-item>
 
     <ion-item>
-      <ion-label position="floating">Description</ion-label>
+      <ion-label position="stacked">Description</ion-label>
       <ion-input v-model="localForm.description" placeholder="Decrivez le probleme"></ion-input>
     </ion-item>
 
     <ion-item>
-      <ion-label position="floating">Entreprise concernée</ion-label>
+      <ion-label position="stacked">Entreprise concernée</ion-label>
       <ion-input v-model="localForm.entreprise" placeholder="Nom de l'entreprise"></ion-input>
     </ion-item>
 
     <ion-item>
-      <ion-label position="floating">Surface (m²)</ion-label>
-      <ion-input type="number" v-model.number="localForm.surface"></ion-input>
+      <ion-label position="stacked">Surface (m²)</ion-label>
+      <ion-input type="number" v-model.number="localForm.surface" placeholder="Ex: 10"></ion-input>
     </ion-item>
 
     <ion-item>
-      <ion-label position="floating">Budget (Ar)</ion-label>
-      <ion-input type="number" v-model.number="localForm.budget"></ion-input>
+      <ion-label position="stacked">Budget (Ar)</ion-label>
+      <ion-input type="number" v-model.number="localForm.budget" placeholder="Ex: 100000"></ion-input>
     </ion-item>
 
     <ion-item>
