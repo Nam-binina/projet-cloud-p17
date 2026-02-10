@@ -1,0 +1,8 @@
+ >
+    bash -c "
+    if [ ! -f /var/lib/postgresql/12/main/PG_VERSION ]; then
+      echo '🗺️ Import de la carte OSM...';
+      run import;
+    fi;
+    echo 'Démarrage du tile server';
+    run
