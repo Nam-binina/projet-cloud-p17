@@ -64,10 +64,12 @@ async function onLogin() {
       if (!Number.isNaN(blockedDate.getTime())) {
         if (blockedDate > new Date()) {
           errorMessage.value = `Compte bloqué jusqu'au ${blockedDate.toLocaleString()}.`;
+          isLoading.value = false;
           return;
         }
       } else {
         errorMessage.value = 'Compte bloqué. Contactez un administrateur pour le débloquer.';
+        isLoading.value = false;
         return;
       }
     }
@@ -88,8 +90,34 @@ async function resetLoginAttempts(refDoc: any, emailValue: string) {
     email: emailValue,
     failedAttempts: 0,
     blockedUntil: null,
+  });
 }
 
+async function recordFailedAttempt(refDoc: any, attemptData: any, emailValue: string) {
+  const now = Date.now();
+  const prev = attemptData?.failedAttempts || 0;
+  const failedAttempts = prev + 1;
+  let blockedUntil: string | null = null;
+  let blockMessage: string | null = null;
+
+  if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+    // block for 15 minutes
+    const blockDurationMs = 15 * 60 * 1000;
+    blockedUntil = new Date(now + blockDurationMs).toISOString();
+    blockMessage = `Compte bloqué pour ${Math.round(blockDurationMs / 60000)} minutes.`;
+  }
+
+  await setDoc(refDoc, {
+    email: emailValue,
+    failedAttempts,
+    blockedUntil,
+    lastFailedAt: new Date(now).toISOString()
+  }, { merge: true });
+
+  return blockMessage;
+}
+</script>
+<style>
 .card-header h2 {
   color: #1a1a1a;
   font-weight: 800;

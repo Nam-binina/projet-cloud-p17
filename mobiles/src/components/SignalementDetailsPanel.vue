@@ -42,20 +42,68 @@
           <img :src="photo.url" :alt="'Photo ' + (index + 1)" />
         </div>
       </div>
+
+      <div v-if="canAddPhotos" class="add-photos">
+        <ion-item lines="none">
+          <ion-label>Ajouter des photos</ion-label>
+          <input
+            ref="fileInput"
+            class="photo-input"
+            type="file"
+            multiple
+            accept="image/*"
+            @change="onFilesChange"
+          />
+        </ion-item>
+        <ion-button
+          expand="block"
+          size="small"
+          :disabled="newPhotos.length === 0 || isUploading"
+          @click="submitPhotos"
+        >
+          <ion-spinner v-if="isUploading" name="crescent"></ion-spinner>
+          <span v-else>Ajouter</span>
+        </ion-button>
+
+        <div v-if="uploadError" class="error-box">
+          {{ uploadError }}
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { IonButton, IonIcon, IonSpinner } from '@ionic/vue';
+import { ref } from 'vue';
+import { IonButton, IonIcon, IonItem, IonLabel, IonSpinner } from '@ionic/vue';
 import { closeOutline, imagesOutline, imageOutline } from 'ionicons/icons';
 
-defineProps<{
+const props = defineProps<{
   signalement: any | null;
   photos: any[];
   loadingPhotos: boolean;
   formatDate: (date: any) => string;
+  canAddPhotos: boolean;
+  isUploading: boolean;
+  uploadError: string;
 }>();
+
+const emit = defineEmits(['close', 'open-photo', 'add-photos']);
+
+const newPhotos = ref<File[]>([]);
+const fileInput = ref<HTMLInputElement | null>(null);
+
+function onFilesChange(event: Event) {
+  const target = event.target as HTMLInputElement | null;
+  newPhotos.value = target?.files ? Array.from(target.files) : [];
+}
+
+function submitPhotos() {
+  if (newPhotos.value.length === 0 || props.isUploading) return;
+  emit('add-photos', newPhotos.value);
+  newPhotos.value = [];
+  if (fileInput.value) fileInput.value.value = '';
+}
 </script>
 
 <style scoped>
@@ -163,5 +211,27 @@ defineProps<{
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.error-box {
+  margin-top: 10px;
+  background: #fff5f5;
+  color: #e63946;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #ffe3e3;
+}
+
+.add-photos {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+}
+
+.photo-input {
+  width: 100%;
+  font-size: 12px;
 }
 </style>
