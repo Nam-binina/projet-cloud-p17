@@ -2,64 +2,15 @@
   <ion-page>
     <ion-content :fullscreen="true" class="login-content">
       <div class="center-container">
-        <div class="auth-shell">
-          
-          <div class="hero">
-            <div class="logo-box">
-              <ion-icon :icon="warningOutline" class="main-icon"></ion-icon>
-            </div>
-            <h1>Mobile Signal</h1>
-            <p>Connectez-vous pour signaler et suivre vos interventions.</p>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <h2>Connexion</h2>
-              <p>Accédez à votre espace sécurisé</p>
-            </div>
-
-            <div class="input-group">
-              <ion-label class="custom-label">Email</ion-label>
-              <ion-item lines="none" class="field">
-                <ion-icon slot="start" :icon="mailOutline"></ion-icon>
-                <ion-input
-                  type="email"
-                  v-model="email"
-                  placeholder="exemple@email.com"
-                  clear-input>
-                </ion-input>
-              </ion-item>
-            </div>
-
-            <div class="input-group">
-              <ion-label class="custom-label">Mot de passe</ion-label>
-              <ion-item lines="none" class="field">
-                <ion-icon slot="start" :icon="lockClosedOutline"></ion-icon>
-                <ion-input
-                  type="password"
-                  v-model="password"
-                  placeholder="••••••••">
-                </ion-input>
-              </ion-item>
-            </div>
-
-            <ion-button
-              expand="block"
-              shape="round"
-              class="cta"
-              :disabled="isLoading"
-              @click="onLogin">
-              <ion-spinner name="crescent" v-if="isLoading"></ion-spinner>
-              <span v-else>Se connecter</span>
-            </ion-button>
-
-            <div v-if="errorMessage" class="error-box">
-              <ion-icon :icon="alertCircleOutline"></ion-icon>
-              <span>{{ errorMessage }}</span>
-            </div>
-          </div>
-          
-        </div>
+        <LoginCard
+          :email="email"
+          :password="password"
+          :is-loading="isLoading"
+          :error-message="errorMessage"
+          @update:email="email = $event"
+          @update:password="password = $event"
+          @submit="onLogin"
+        />
       </div>
     </ion-content>
   </ion-page>
@@ -71,22 +22,8 @@ import { useRouter } from 'vue-router';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { useCurrentUser } from 'vuefire';
-import {
-  IonPage,
-  IonContent,
-  IonItem,
-  IonLabel,
-  IonInput,
-  IonButton,
-  IonIcon,
-  IonSpinner
-} from '@ionic/vue';
-import { 
-  mailOutline, 
-  lockClosedOutline, 
-  warningOutline, 
-  alertCircleOutline 
-} from 'ionicons/icons';
+import { IonPage, IonContent } from '@ionic/vue';
+import LoginCard from '../components/LoginCard.vue';
 
 const MAX_FAILED_ATTEMPTS = 3;
 
@@ -127,10 +64,12 @@ async function onLogin() {
       if (!Number.isNaN(blockedDate.getTime())) {
         if (blockedDate > new Date()) {
           errorMessage.value = `Compte bloqué jusqu'au ${blockedDate.toLocaleString()}.`;
+          isLoading.value = false;
           return;
         }
       } else {
         errorMessage.value = 'Compte bloqué. Contactez un administrateur pour le débloquer.';
+        isLoading.value = false;
         return;
       }
     }
@@ -151,101 +90,47 @@ async function resetLoginAttempts(refDoc: any, emailValue: string) {
     email: emailValue,
     failedAttempts: 0,
     blockedUntil: null,
-    updatedAt: new Date().toISOString()
-  }, { merge: true });
+  });
 }
 
 async function recordFailedAttempt(refDoc: any, attemptData: any, emailValue: string) {
-  const previousAttempts = attemptData?.failedAttempts || 0;
-  const newFailedAttempts = previousAttempts + 1;
-  const payload: any = {
-    email: emailValue,
-    failedAttempts: newFailedAttempts,
-    updatedAt: new Date().toISOString()
-  };
+  const now = Date.now();
+  const prev = attemptData?.failedAttempts || 0;
+  const failedAttempts = prev + 1;
+  let blockedUntil: string | null = null;
+  let blockMessage: string | null = null;
 
-  let blockMessage = '';
-
-  if (newFailedAttempts >= MAX_FAILED_ATTEMPTS) {
-    if (!attemptData?.blockedUntil) {
-      payload.blockedUntil = 'manual';
-    }
-    blockMessage = 'Trop de tentatives. Contactez un administrateur pour débloquer votre compte.';
+  if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+    // block for 15 minutes
+    const blockDurationMs = 15 * 60 * 1000;
+    blockedUntil = new Date(now + blockDurationMs).toISOString();
+    blockMessage = `Compte bloqué pour ${Math.round(blockDurationMs / 60000)} minutes.`;
   }
 
-  await setDoc(refDoc, payload, { merge: true });
+  await setDoc(refDoc, {
+    email: emailValue,
+    failedAttempts,
+    blockedUntil,
+    lastFailedAt: new Date(now).toISOString()
+  }, { merge: true });
+
   return blockMessage;
 }
 </script>
-
-<style scoped>
-/* COULEURS : Fond Jaune (#FFC107), Carte Blanche (#FFFFFF), Accents Noirs (#1a1a1a) et Rouges (#e63946) */
-
+<style>
+/* Page background and centering */
 .login-content {
-  /* Fond Jaune (style signalisation routière) */
-  --background: #FFC107; 
-}
-
-.center-container {
+  background: linear-gradient(135deg, #eae366 0%, #e2af2f 100%);
   display: flex;
-  flex-direction: column;
-  justify-content: center;
   align-items: center;
-  min-height: 100%;
+  justify-content: center;
+}
+.center-container {
   width: 100%;
-}
-
-.auth-shell {
-  width: min(400px, 92vw);
   display: flex;
-  flex-direction: column;
-  gap: 15px;
-  padding: 20px;
-}
-
-/* Hero Section */
-.hero {
-  /* Texte noir sur fond jaune pour un contraste maximal */
-  color: #1a1a1a; 
-  text-align: center;
-  margin-bottom: 10px;
-}
-
-.main-icon {
-  font-size: 75px;
-  /* L'icône en noir sur le fond jaune */
-  color: #1a1a1a; 
-}
-
-.hero h1 {
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  margin: 10px 0 5px;
-  font-size: 28px;
-}
-
-.hero p {
-  margin: 0;
-  font-weight: 600;
-  opacity: 0.8;
-  font-size: 14px;
-}
-
-/* Card Design */
-.card {
-  background: #ffffff; /* Fond Blanc reste pur */
-  border-radius: 24px;
-  padding: 30px 25px;
-  /* Ombre plus prononcée car le fond est clair */
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-  /* Optionnel : une petite bordure noire pour le style "panneau" */
-  border: 2px solid #1a1a1a;
-}
-
-.card-header {
-  text-align: center;
-  margin-bottom: 25px;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
 }
 
 .card-header h2 {
@@ -288,19 +173,17 @@ async function recordFailedAttempt(refDoc: any, attemptData: any, emailValue: st
   color: #1a1a1a;
 }
 
-/* Button CTA - Rouge pour l'action et le rappel du danger */
 .cta {
   margin-top: 15px;
-  --background: #e63946; 
-  --color: #ffffff;
+  --background: #FFD700; 
+  --color: #1a1a1a;
   font-weight: 800;
   height: 58px;
   font-size: 16px;
   text-transform: uppercase;
-  box-shadow: 0 8px 15px rgba(230, 57, 70, 0.3);
+  box-shadow: 0 8px 15px rgba(255, 215, 0, 0.24);
 }
 
-/* Error Message */
 .error-box {
   margin-top: 20px;
   background: #fff5f5;

@@ -1,221 +1,124 @@
-const admin = require("../config/firebase-admin");
-const db = admin.firestore();
+const { executeQuery } = require("../config/postgresql");
 
 class SignalementService {
+  async listSignalements(limit = 50, startAfterId = null) {
+    return this.list(limit, startAfterId);
+  }
 
-    async listSignalements(limit = 50, startAfterId = null) {
-        try {
-            // Récupérer tous les signalements sans ordre (pour éviter les problèmes d'index)
-            let query = db.collection("signalements");
+  async list(limit = 50, startAfterId = null) {
+    const q = `SELECT * FROM signalements WHERE deleted_at IS NULL ORDER BY date DESC LIMIT $1`;
+    const res = await executeQuery(q, [limit]);
+    return res.rows;
+  }
 
-            const snapshot = await query.get();
+  async getSignalementById(id) {
+    const res = await executeQuery(`SELECT * FROM signalements WHERE id = $1 AND deleted_at IS NULL`, [id]);
+    if (res.rows.length === 0) throw new Error('Signalement introuvable');
+    return res.rows[0];
+  }
 
-            const signalements = [];
-            snapshot.forEach(doc => {
-                signalements.push({
-                    id: doc.id,
-                    ...doc.data()
-                });
-            });
+  async createSignalement(data) {
+    const q = `INSERT INTO signalements (description, entreprise, position, status, surface, budget, user_id, date, date_debut, date_fin, photos, sync_status, created_at, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'PENDING',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING *`;
+    const params = [
+      data.descriptiotn || data.description,
+      data.entreprise || null,
+      data.position ? JSON.stringify(data.position) : null,
+      data.status || 'Nouveau',
+      data.surface || 0,
+      data.budget || 0,
+      data.user_id,
+      data.date || new Date().toISOString(),
+      data.date_debut || null,
+      data.date_fin || null,
+      data.photos ? JSON.stringify(data.photos) : '[]'
+    ];
 
-            // Trier par date côté serveur
-            signalements.sort((a, b) => {
-                const dateA = new Date(a.date || 0);
-                const dateB = new Date(b.date || 0);
-                return dateB - dateA; // Descending order
-            });
+    const res = await executeQuery(q, params);
+    const created = res.rows[0];
 
-            // Appliquer la limite
-            return signalements.slice(0, limit);
-
-        } catch (error) {
-            console.error("Erreur Firestore, utilisation de données de test:", error.message);
-            // Fallback avec données de test
-            return [
-                { id: 'test-1', title: 'Activité suspecte sur un compte', type: 'Fraud', severity: 'High', status: 'Open', reportedBy: 'Jean Dupont', date: new Date(Date.now() - 86400000).toISOString(), description: 'Tentatives de connexion non autorisées' },
-                { id: 'test-2', title: 'Contenu inapproprié', type: 'Content', severity: 'Medium', status: 'pending', reportedBy: 'Marie Martin', date: new Date(Date.now() - 172800000).toISOString(), description: 'Publication de contenu interdit' },
-                { id: 'test-3', title: 'Problème de paiement', type: 'Payment', severity: 'High', status: 'resolved', reportedBy: 'Pierre Durand', date: new Date(Date.now() - 259200000).toISOString(), description: 'Transaction échouée' },
-                { id: 'test-4', title: 'Service client insatisfaisant', type: 'Support', severity: 'Low', status: 'Open', reportedBy: 'Sophie Bernard', date: new Date(Date.now() - 345600000).toISOString(), description: 'Agent non coopératif' },
-                { id: 'test-5', title: 'Bug technique', type: 'Bug', severity: 'Medium', status: 'in_review', reportedBy: 'Luc Petit', date: new Date(Date.now() - 432000000).toISOString(), description: 'L\'application plante sur certaines pages' },
-                { id: 'test-6', title: 'Compromission de compte', type: 'Security', severity: 'Critical', status: 'Open', reportedBy: 'Emma Leroy', date: new Date(Date.now() - 518400000).toISOString(), description: 'Tentative de prise de contrôle de compte' },
-            ];
-        }
+    try {
+      await executeQuery(`INSERT INTO sync_queue (entity, entity_id, action, payload, status, created_at) VALUES ($1,$2,$3,$4,'PENDING',CURRENT_TIMESTAMP)`, [
+        'signalements', String(created.id), 'CREATE', JSON.stringify(created)
+      ]);
+    } catch (e) {
+      console.warn('Failed to enqueue signalement sync:', e.message);
     }
 
-    async getSignalementById(id) {
-        try {
-            const doc = await db.collection("signalements").doc(id).get();
-            if (!doc.exists) {
-                throw new Error("Signalement introuvable");
-            }
-            return { id: doc.id, ...doc.data() };
-        } catch (error) {
-            console.error("Erreur getSignalementById :", error.message);
-            throw error;
-        }
+    return created;
+  }
+
+  async updateSignalement(id, data) {
+    const allowed = ['description','entreprise','position','status','surface','budget','date','date_debut','date_fin','photos'];
+    const sets = [];
+    const params = [];
+    let idx = 1;
+    for (const key of Object.keys(data)) {
+      if (!allowed.includes(key)) continue;
+      sets.push(`${key} = $${idx}`);
+      if (key === 'position' || key === 'photos') params.push(JSON.stringify(data[key])); else params.push(data[key]);
+      idx++;
+    }
+    if (sets.length === 0) throw new Error('Aucun champ autorisé à mettre à jour');
+    params.push(id);
+    const q = `UPDATE signalements SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idx} RETURNING *`;
+    const res = await executeQuery(q, params);
+    if (res.rows.length === 0) throw new Error('Signalement introuvable');
+    const updated = res.rows[0];
+
+    try {
+      await executeQuery(`INSERT INTO sync_queue (entity, entity_id, action, payload, status, created_at) VALUES ($1,$2,$3,$4,'PENDING',CURRENT_TIMESTAMP)`, [
+        'signalements', String(updated.id), 'UPDATE', JSON.stringify(updated)
+      ]);
+    } catch (e) {
+      console.warn('Failed to enqueue signalement update sync:', e.message);
     }
 
-    async createSignalement(data) {
-        try {
-            const newDoc = await db.collection("signalements").add({
-                ...data,
-                status: data.status || "pending"
-            });
+    return updated;
+  }
 
-            const docSnap = await newDoc.get();
-            return { id: newDoc.id, ...docSnap.data() };
-        } catch (error) {
-            console.error("Erreur création signalement :", error.message);
-            throw new Error("Impossible de créer le signalement");
-        }
+  async deleteSignalement(id) {
+    const res = await executeQuery(`UPDATE signalements SET deleted_at = CURRENT_TIMESTAMP, sync_status = 'PENDING' WHERE id = $1 RETURNING *`, [id]);
+    if (res.rows.length === 0) throw new Error('Signalement introuvable');
+
+    try {
+      await executeQuery(`INSERT INTO sync_queue (entity, entity_id, action, payload, status, created_at) VALUES ($1,$2,$3,$4,'PENDING',CURRENT_TIMESTAMP)`, [
+        'signalements', String(id), 'DELETE', JSON.stringify({ id })
+      ]);
+    } catch (e) {
+      console.warn('Failed to enqueue signalement delete sync:', e.message);
     }
 
-    async updateSignalement(id, data) {
-        try {
-            const docRef = db.collection("signalements").doc(id);
-            const docSnap = await docRef.get();
+    return { message: 'Signalement supprimé (soft delete)' };
+  }
 
-            if (!docSnap.exists) {
-                throw new Error("Signalement introuvable");
-            }
+  async getSignalementsByUserId(userId, limit = 100) {
+    const res = await executeQuery(`SELECT * FROM signalements WHERE user_id = $1 AND deleted_at IS NULL ORDER BY date DESC LIMIT $2`, [userId, limit]);
+    return res.rows;
+  }
 
-            await docRef.update(data);
+  async cleanupTimestamps() {
+    return { cleaned: 0 };
+  }
 
-            const updatedSnap = await docRef.get();
-            return { id: updatedSnap.id, ...updatedSnap.data() };
-        } catch (error) {
-            console.error("Erreur update signalement :", error.message);
-            throw error;
-        }
-    }
+  async uploadSignalementPhotos(id, files = []) {
+    if (!id) throw new Error('ID du signalement requis');
+    if (!files || files.length === 0) return [];
 
-    async deleteSignalement(id) {
-        try {
-            const docRef = db.collection("signalements").doc(id);
-            const docSnap = await docRef.get();
+    const photoNames = files.map(f => f.filename).filter(Boolean);
+    if (photoNames.length === 0) return [];
 
-            if (!docSnap.exists) {
-                throw new Error("Signalement introuvable");
-            }
+    const q = `UPDATE signalements SET photos = COALESCE(photos, '[]'::jsonb) || $1::jsonb, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING photos`;
+    const res = await executeQuery(q, [JSON.stringify(photoNames), id]);
+    const photos = (res.rows[0] && res.rows[0].photos) ? res.rows[0].photos : [];
+    return photoNames;
+  }
 
-            await docRef.delete();
-            return { message: "Signalement supprimé avec succès" };
-        } catch (error) {
-            console.error("Erreur delete signalement :", error.message);
-            throw error;
-        }
-    }
-
-    async getSignalementsByUserId(userId, limit = 100) {
-        try {
-            // Charger tous les signalements et filtrer côté serveur
-            const snapshot = await db.collection("signalements").get();
-
-            const signalements = [];
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                // Filtrer par user_id côté serveur
-                if (data.user_id === userId) {
-                    signalements.push({
-                        id: doc.id,
-                        ...data
-                    });
-                }
-            });
-
-            // Trier par date (descendant)
-            signalements.sort((a, b) => {
-                const dateA = new Date(a.date || 0);
-                const dateB = new Date(b.date || 0);
-                return dateB - dateA;
-            });
-
-            // Appliquer la limite
-            return signalements.slice(0, limit);
-        } catch (error) {
-            console.error("Erreur getSignalementsByUserId :", error.message);
-            throw error;
-        }
-    }
-
-    async cleanupTimestamps() {
-        try {
-            const snapshot = await db.collection("signalements").get();
-            const batch = db.batch();
-            let count = 0;
-
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                if (data.createdAt || data.updatedAt) {
-                    const updateData = { ...data };
-                    delete updateData.createdAt;
-                    delete updateData.updatedAt;
-                    batch.update(doc.ref, updateData);
-                    count++;
-                }
-            });
-
-            if (count > 0) {
-                await batch.commit();
-            }
-            return { cleaned: count };
-        } catch (error) {
-            console.error("Erreur cleanup timestamps :", error.message);
-            throw error;
-        }
-    }
-
-    async uploadSignalementPhotos(id, files = []) {
-        try {
-            if (!id) {
-                throw new Error("ID du signalement requis");
-            }
-
-            const docRef = db.collection("signalements").doc(id);
-            const docSnap = await docRef.get();
-            if (!docSnap.exists) {
-                throw new Error("Signalement introuvable");
-            }
-
-            if (!files.length) {
-                return [];
-            }
-
-            const photoNames = files
-                .map(file => file.filename)
-                .filter(Boolean);
-
-            if (photoNames.length > 0) {
-                await docRef.update({
-                    photos: admin.firestore.FieldValue.arrayUnion(...photoNames)
-                });
-            }
-
-            return photoNames;
-        } catch (error) {
-            console.error("Erreur upload photos signalement :", error.message);
-            throw error;
-        }
-    }
-
-    async listSignalementPhotos(id) {
-        try {
-            if (!id) {
-                throw new Error("ID du signalement requis");
-            }
-
-            const doc = await db.collection("signalements").doc(id).get();
-            if (!doc.exists) {
-                throw new Error("Signalement introuvable");
-            }
-
-            const data = doc.data();
-            return Array.isArray(data.photos) ? data.photos : [];
-        } catch (error) {
-            console.error("Erreur récupération photos signalement :", error.message);
-            throw error;
-        }
-    }
+  async listSignalementPhotos(id) {
+    const res = await executeQuery(`SELECT photos FROM signalements WHERE id = $1`, [id]);
+    if (res.rows.length === 0) throw new Error('Signalement introuvable');
+    return Array.isArray(res.rows[0].photos) ? res.rows[0].photos : [];
+  }
 }
 
 module.exports = new SignalementService();

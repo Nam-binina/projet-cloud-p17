@@ -74,7 +74,7 @@ async function initializeDatabase() {
   try {
     const client = await pool.connect();
     
-    // Créer la table users si elle n'existe pas
+    // Créer la table users si elle n'existe pas (avec colonnes de sync et role)
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -82,6 +82,11 @@ async function initializeDatabase() {
         password VARCHAR(255) NOT NULL,
         firebase_uid VARCHAR(255),
         email_verified BOOLEAN DEFAULT FALSE,
+        failed_attempts INTEGER DEFAULT 0,
+        blocked_until TIMESTAMP DEFAULT NULL,
+        role VARCHAR(50) DEFAULT 'user',
+        sync_status VARCHAR(20) DEFAULT 'SYNCED',
+        deleted_at TIMESTAMP DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_login TIMESTAMP
@@ -97,7 +102,89 @@ async function initializeDatabase() {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid)
     `);
-    
++
++    // Indexes pour role/sync
++    await client.query(`
++      CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)
++    `);
++    await client.query(`
++      CREATE INDEX IF NOT EXISTS idx_users_sync_status ON users(sync_status)
++    `);
+
+    // Créer la table signalements si elle n'existe pas (source de verite PostgreSQL)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS signalements (
+        id SERIAL PRIMARY KEY,
+        firebase_id VARCHAR(255),
+        description TEXT NOT NULL,
+        entreprise VARCHAR(255),
+        position JSONB,
+        status VARCHAR(50) DEFAULT 'nouveau',
+        surface NUMERIC(12,2) DEFAULT 0,
+        budget NUMERIC(14,2) DEFAULT 0,
+        user_id VARCHAR(255) NOT NULL,
+        date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        date_debut TIMESTAMP NULL,
+        date_fin TIMESTAMP NULL,
+        photos JSONB DEFAULT '[]'::jsonb,
+        sync_status VARCHAR(20) DEFAULT 'SYNCED',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TIMESTAMP NULL
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_signalements_firebase_id ON signalements(firebase_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_signalements_user_id ON signalements(user_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_signalements_status ON signalements(status)
+    `);
+
+    // Créer la table sync_queue si elle n'existe pas
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS sync_queue (
+        id SERIAL PRIMARY KEY,
+        entity VARCHAR(50) NOT NULL,
+        entity_id VARCHAR(255) NOT NULL,
+        action VARCHAR(20) NOT NULL,
+        payload JSONB NOT NULL,
+        status VARCHAR(20) DEFAULT 'PENDING',
+        retries INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_sync_queue_entity_id ON sync_queue(entity_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_sync_queue_updated_at ON sync_queue(updated_at)
+    `);
+
+    // Créer la table sync_log si elle n'existe pas
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS sync_log (
+        id SERIAL PRIMARY KEY,
+        direction VARCHAR(10) NOT NULL,
+        entity VARCHAR(50) NOT NULL,
+        status VARCHAR(20) NOT NULL,
+        error TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_sync_log_created_at ON sync_log(created_at)
+    `);
+
     client.release();
     
     console.log("Base de données PostgreSQL initialisée");

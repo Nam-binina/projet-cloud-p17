@@ -3,6 +3,9 @@ const router = require("./routes");
 const cors = require("cors");
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const { checkConnectivityStatus } = require('./utils/connectionUtils');
+const syncService = require('./services/sync.service');
+const { syncBidirectional } = require('./utils/synchronisationUtils');
 require("dotenv").config();
 
 const SERVER_PORT = process.env.SERVER_PORT || 3000;
@@ -20,7 +23,7 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-const uploadsPath = path.resolve(__dirname, '../../web-content/web/public/uploads');
+const uploadsPath = process.env.UPLOAD_DIR || path.resolve(__dirname, '../uploads');
 app.use('/uploads', express.static(uploadsPath));
 
 
@@ -34,9 +37,13 @@ app.get('/', (req, res) => {
     res.send('Hello World');
 });
 
+// Periodic sync job disabled (PostgreSQL-only auth mode)
 
-app.listen(SERVER_PORT, SERVER_HOST, () => {
-    console.log(`Listening on ${SERVER_HOST}:${SERVER_PORT}`);
-});
+
+if (require.main === module) {
+    app.listen(SERVER_PORT, SERVER_HOST, () => {
+        console.log(`Listening on ${SERVER_HOST}:${SERVER_PORT}`);
+    });
+}
 
 module.exports = app;

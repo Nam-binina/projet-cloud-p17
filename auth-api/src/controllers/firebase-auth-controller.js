@@ -44,6 +44,7 @@ class FirebaseAuthController {
         password: "Password is required",
       });
     }
+
     signInWithEmailAndPassword(auth, email, password)
       .then((userCredential) => {
         const idToken = userCredential._tokenResponse.idToken

@@ -100,7 +100,6 @@ const CustomersTable = ({ userData }) => {
     }
   };
 
-  // Bloquer un utilisateur
   const handleBlockUser = async (email) => {
     setActionLoading(true);
     setActionMessage(null);
@@ -120,7 +119,6 @@ const CustomersTable = ({ userData }) => {
     }
   };
 
-  // Débloquer un utilisateur
   const handleUnblockUser = async (email) => {
     setActionLoading(true);
     setActionMessage(null);
